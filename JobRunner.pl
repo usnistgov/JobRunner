@@ -97,9 +97,10 @@ my $toprint = "";
 my $verb = 0;
 my $redobad = 0;
 my $okquit = 0;
+my @destdir = ();
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:                      V     bc    h   l n       v      #
+# Used:   C                  V     bc    h   l n       v      #
 
 my %opt = ();
 GetOptions
@@ -108,11 +109,12 @@ GetOptions
    'help',
    'version',
    'lockdir=s'   => \$blockdir,
-   'checkfiles=s' => \@checkfiles,
+   'checkfile=s' => \@checkfiles,
    'name=s' => \$toprint,
    'Verbose' => \$verb,
    'badErase' => \$redobad,
    'okquit'   => \$okquit,
+   'CreateDir' => \@destdir,
   ) or MMisc::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 MMisc::ok_quit("\n$usage\n") if (($opt{'help'}) || (scalar @ARGV == 0));
 MMisc::ok_quit("$versionid\n") if ($opt{'version'});
@@ -224,6 +226,11 @@ MMisc::error_quit("${toprint}Could not create writable dir ($dsRun)")
   if (! MMisc::make_wdir($dsRun));
 my $flf = "$dsRun/$logfile";
 
+foreach my $ddir (@destdir) {
+  MMisc::error_quit("${toprint}Could not create requested \'CreateDir\' dir ($ddir)")
+    if (! MMisc::make_wdir($ddir));
+}
+
 my ($rv, $tx, $so, $se, $retcode, $flogfile)
   = MMisc::write_syscall_smart_logfile($flf, @ARGV);
 vprint("-- Final Logfile different from expected one: $flogfile")
@@ -237,7 +244,7 @@ if ($retcode == 0) {
 ## If we are here, it means it was a BAD run
 &rod($dsRun, $dsBad); # Move to "bad" status
 $flogfile =~ s%$dsRun%$dsBad%;
-MMisc::error_quit("${toprint}Error during run, see logfile ($flogfile)");
+&error_quit($retcode, "${toprint}Error during run, see logfile ($flogfile)");
 
 ########################################
 
@@ -268,9 +275,10 @@ sub vprint {
 #####
 
 sub error_quit {
+  my $ec = shift @_;
   print('[ERROR] ', join(' ', @_), "\n");
   exit(0) if ($okquit);
-  exit(1);
+  exit($ec);
 }
 
 ########################################
@@ -279,17 +287,20 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--Verbose] --lockdir dir --name text [--checkfiles file1 [--checkfiles file2 [...]]] [--badErase]  -- command_line_to_run
+$0 [--help | --version] [--Verbose] [--okquit] --lockdir dir --name text [--checkfile file [--checkfile file [...]]] [--badErase]  [--CreateDir dir [--CreateDir dir [...]]] -- command_line_to_run
 
 Will execute command_line_to_run if it can be run (not already in progress, completed, bad)
 
 Where:
   --help     This help message
   --version  Version information
+  --Verbose  Print more verbose status updates
+  --okquit   In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
   --lockdir  base lock directory in which is stored the commandline and logfile
   --name     name (converted adapted) to the base lock directory
-  --checkfile  file list checked when a succesful run is present to decide if a re-run is necessary, comparing date of files to that of logfile
+  --checkfile  check file when a succesful run is present to decide if a re-run is necessary, comparing date of files to that of logfile
   --badErase   If a bad run is present, erase run and retry
+  --CreateDir  Before (and only if) running the command line to run, create the required directory
 EOF
 ;
 
