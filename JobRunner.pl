@@ -110,11 +110,11 @@ GetOptions
    'version',
    'lockdir=s'   => \$blockdir,
    'checkfile=s' => \@checkfiles,
-   'name=s' => \$toprint,
-   'Verbose' => \$verb,
-   'badErase' => \$redobad,
-   'okquit'   => \$okquit,
-   'CreateDir' => \@destdir,
+   'name=s'      => \$toprint,
+   'Verbose'     => \$verb,
+   'badErase'    => \$redobad,
+   'okquit'      => \$okquit,
+   'CreateDir=s' => \@destdir,
   ) or MMisc::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 MMisc::ok_quit("\n$usage\n") if (($opt{'help'}) || (scalar @ARGV == 0));
 MMisc::ok_quit("$versionid\n") if ($opt{'version'});
@@ -143,14 +143,14 @@ foreach my $end (@dir_end) {
   my $tmp = "${ds_sep}$end";
   MMisc::error_quit("Requested lockdir can not end in \'$tmp\' ($lockdir)")
       if ($lockdir =~ m%$end$%i);
-  push @all, "$lockdir$end";
+  push @all, "$lockdir$tmp";
 }
 my ($dsDone, $dsSkip, $dsBad, $dsRun) = @all;
 
 my $logfile = "logfile";
 
 foreach my $file (@checkfiles) {
-  my $err = MMisc::check_files_r($file);
+  my $err = MMisc::check_file_r($file);
   MMisc::error_quit("Problem with \'checkfiles\' [$file] : $err")
       if (! MMisc::is_blank($err));
 }
@@ -252,7 +252,7 @@ sub adapt_name {
   my $tmp = $_[0];
   $tmp =~ s%^\s+%%;
   $tmp =~ s%\s+$%%;
-  $tmp =~ s%[^a..z0..9-_]%_%g;
+  $tmp =~ s%[^a..z0..9-_]%_%ig;
   return($tmp);
 }
 
