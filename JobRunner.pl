@@ -86,6 +86,7 @@ Getopt::Long::Configure(qw(auto_abbrev no_ignore_case));
 ########################################
 # Options processing
 
+my $onlycheck_rc = 2;
 my $usage = &set_usage();
 
 # Default values for variables
@@ -98,9 +99,10 @@ my $verb = 0;
 my $redobad = 0;
 my $okquit = 0;
 my @destdir = ();
+my $onlycheck = 0;
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:   C                  V     bc    h   l n       v      #
+# Used:   C           O      V     bc    h   l no      v      #
 
 my %opt = ();
 GetOptions
@@ -115,8 +117,10 @@ GetOptions
    'badErase'    => \$redobad,
    'okquit'      => \$okquit,
    'CreateDir=s' => \@destdir,
+   'OnlyCheck'   => \$onlycheck,
   ) or MMisc::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
-MMisc::ok_quit("\n$usage\n") if (($opt{'help'}) || (scalar @ARGV == 0));
+MMisc::ok_quit("\n$usage\n") if ($opt{'help'});
+MMisc::ok_quit("\n$usage\n") if ((! $onlycheck) && (scalar @ARGV == 0));
 MMisc::ok_quit("$versionid\n") if ($opt{'version'});
 # Remaining of command line is the command to start
 
@@ -221,6 +225,11 @@ MMisc::ok_quit("${toprint}Run already in progress, Skipping")
 
 ##########
 # Actual run
+if ($onlycheck) {
+  vprint("${toprint}Would actually have to run tool, exiting with expected return code ($onlycheck_rc)\n");
+  exit($onlycheck_rc);
+}
+
 vprint("++ Creating \"In Progress\" lock dir");
 MMisc::error_quit("${toprint}Could not create writable dir ($dsRun)")
   if (! MMisc::make_wdir($dsRun));
@@ -252,7 +261,7 @@ sub adapt_name {
   my $tmp = $_[0];
   $tmp =~ s%^\s+%%;
   $tmp =~ s%\s+$%%;
-  $tmp =~ s%[^a..z0..9-_]%_%ig;
+  $tmp =~ s%[^a-z0-9-_]%_%ig;
   return($tmp);
 }
 
@@ -287,7 +296,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--Verbose] [--okquit] --lockdir dir --name text [--checkfile file [--checkfile file [...]]] [--badErase]  [--CreateDir dir [--CreateDir dir [...]]] -- command_line_to_run
+$0 [--help | --version] [--Verbose] [--okquit] [--Onlycheck] --lockdir dir --name text [--checkfile file [--checkfile file [...]]] [--badErase]  [--CreateDir dir [--CreateDir dir [...]]] -- command_line_to_run
 
 Will execute command_line_to_run if it can be run (not already in progress, completed, bad)
 
@@ -295,6 +304,7 @@ Where:
   --help     This help message
   --version  Version information
   --Verbose  Print more verbose status updates
+  --Onlycheck  Do the entire check list but before doing the actual run, exit with a return code value of \"$onlycheck_rc\" (reminder: 1 means that there was an issue, 0 means that the program exited succesfuly, ie in this case a previous run completed -- it can still be a bad run, use \'--badErase\' to insure redoing those)
   --okquit   In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
   --lockdir  base lock directory in which is stored the commandline and logfile
   --name     name (converted adapted) to the base lock directory
