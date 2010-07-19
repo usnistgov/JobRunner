@@ -230,6 +230,10 @@ if ($onlycheck) {
   exit($onlycheck_rc);
 }
 
+# In case the user use Ctrl+C do not return "ok"
+sub SIGINTh { MMisc::error_quit("\'Ctrl+C\'-ed, exiting with error status"); }
+$SIG{'INT'} = 'SIGINTh';
+
 vprint("++ Creating \"In Progress\" lock dir");
 MMisc::error_quit("${toprint}Could not create writable dir ($dsRun)")
   if (! MMisc::make_wdir($dsRun));
