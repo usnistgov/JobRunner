@@ -88,6 +88,7 @@ Getopt::Long::Configure(qw(auto_abbrev no_ignore_case));
 
 my $onlycheck_rc = 2;
 my $usage = &set_usage();
+MMisc::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 # Default values for variables
 # none here
@@ -100,9 +101,11 @@ my $redobad = 0;
 my $okquit = 0;
 my @destdir = ();
 my $onlycheck = 0;
+my $executable = undef;
+my $rlogfile = "";
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:   C           O      V     bc    h   l no      v      #
+# Used:   C        L  O      V     bc e  h   l no      v      #
 
 my %opt = ();
 GetOptions
@@ -118,11 +121,23 @@ GetOptions
    'okquit'      => \$okquit,
    'CreateDir=s' => \@destdir,
    'OnlyCheck'   => \$onlycheck,
+   'executable=s' => \$executable,
+   'LogFile=s'   => \$rlogfile,
   ) or MMisc::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 MMisc::ok_quit("\n$usage\n") if ($opt{'help'});
-MMisc::ok_quit("\n$usage\n") if ((! $onlycheck) && (scalar @ARGV == 0));
 MMisc::ok_quit("$versionid\n") if ($opt{'version'});
+
 # Remaining of command line is the command to start
+MMisc::error_quit("\'executable\' and command line can not be used at the same time")
+  if ((defined $executable) && (scalar @ARGV > 0));
+MMisc::error_quit("Neither \'executable\', nor command line are specified, and we are not in \'OnlyCheck\' mode")
+  if ((! defined $executable) && (scalar @ARGV == 0) && (! $onlycheck));
+
+if (defined $executable) {
+  my $err = MMisc::check_file_x($executable);
+  MMisc::error_quit("Problem with \'executable\' ($executable): $err")
+    if (! MMisc::is_blank($err));
+}
 
 $blockdir =~ s%\/$%%; # remove trailing /
 MMisc::error_quit("No \'lockdir\' specified, aborting")
@@ -146,12 +161,13 @@ my @all = ();
 foreach my $end (@dir_end) {
   my $tmp = "${ds_sep}$end";
   MMisc::error_quit("Requested lockdir can not end in \'$tmp\' ($lockdir)")
-      if ($lockdir =~ m%$end$%i);
+      if ($lockdir =~ m%$tmp$%i);
   push @all, "$lockdir$tmp";
 }
 my ($dsDone, $dsSkip, $dsBad, $dsRun) = @all;
+#print "[+] ", join("\n[+] ", @all), "\n";
 
-my $logfile = "logfile";
+my $blogfile = "logfile";
 
 foreach my $file (@checkfiles) {
   my $err = MMisc::check_file_r($file);
@@ -159,23 +175,21 @@ foreach my $file (@checkfiles) {
       if (! MMisc::is_blank($err));
 }
 
-if (! MMisc::is_blank($toprint)) {
-  vprint("%% In progress: $toprint\n");
-  $toprint = "$toprint -- "; # convert to print ready
-}
+my $toprint2 = (! MMisc::is_blank($toprint)) ? "$toprint -- " : ""; 
 
 my @mulcheck = ();
-foreach my $tmpld (qw/$dsDone $dsSkip $dsBad $dsRun/) {
-  push @mulcheck, $tmpld
+foreach my $tmpld (@all) {
+  push(@mulcheck, $tmpld)
     if (MMisc::does_dir_exists($tmpld));
 }
-MMisc::error_quit("${toprint}Can not run program, lockdir already exists in multiple states:\n - " . join("\n - ", @mulcheck))
+MMisc::error_quit("${toprint2}Can not run program, lockdir already exists in multiple states:\n - " . join("\n - ", @mulcheck))
   if (scalar @mulcheck > 1);
+#print "[*] ", join("\n[*] ", @mulcheck), "\n";
 
 
 ##########
 ## Skip ?
-MMisc::ok_quit("${toprint}Skip requested")
+MMisc::ok_quit("${toprint2}Skip requested")
   if (MMisc::does_dir_exists($dsSkip));
 
 
@@ -183,13 +197,13 @@ MMisc::ok_quit("${toprint}Skip requested")
 ##########
 ## Previously bad ?
 if (MMisc::does_dir_exists($dsBad)) {
-  MMisc::ok_quit("${toprint}Previous bad run present, skipping")
+  MMisc::ok_quit("${toprint2}Previous bad run present, skipping")
       if (! $redobad);
 
   vprint("!! Deleting previous run lockdir [$dsBad]");
   
   `rm -rf $dsBad`;
-  MMisc::error_quit("${toprint}Problem deleting \'bad\' lockdir [$dsBad], still present ?")
+  MMisc::error_quit("${toprint2}Problem deleting \'bad\' lockdir [$dsBad], still present ?")
       if (MMisc::does_dir_exists($dsBad));
 }
 
@@ -198,66 +212,71 @@ if (MMisc::does_dir_exists($dsBad)) {
 ##########
 ## Previously done ?
 if (MMisc::does_dir_exists($dsDone)) {
-  MMisc::ok_quit("${toprint}Previously succesfully completed")
-      if (scalar @checkfiles == 0);
-
-  my $flf = "$dsDone/$logfile";
+  MMisc::ok_quit("${toprint2}Previously succesfully completed")
+    if (scalar @checkfiles == 0);
+  
+  my $flf = (MMisc::is_blank($rlogfile)) ? "$dsDone/$blogfile" : $rlogfile;
+  
   if (MMisc::does_file_exists($flf)) {
-    MMisc::ok_quit("${toprint}Previously succesfully completed, and no files listed in \'checkfiles\' is newer than the logfile, not re-runing")
-        if (MMisc::newest($flf, @checkfiles) eq $flf);
-    vprint("!! ${toprint}Previously succesfully completed, but at least one file listed in \'checkfiles\' is newer than the logfile => re-runing");
+    MMisc::ok_quit("${toprint2}Previously succesfully completed, and no files listed in \'checkfiles\' is newer than the logfile, not re-runing")
+      if (MMisc::newest($flf, @checkfiles) eq $flf);
+    vprint("!! ${toprint2}Previously succesfully completed, but at least one file listed in \'checkfiles\' is newer than the logfile => re-runing");
   } else {
-    vprint("!! ${toprint}Previously succesfully completed, but logfile absent => considering as new run");
+    vprint("!! ${toprint2}Previously succesfully completed, but logfile absent => considering as new run");
   }
   
   vprint("!! Deleting previous run lockdir [$dsDone]");
   `rm -rf $dsDone`;
-  MMisc::error_quit("${toprint}Problem deleting lockdir [$dsDone], still present ?")
-      if (MMisc::does_dir_exists($dsDone));
+  MMisc::error_quit("${toprint2}Problem deleting lockdir [$dsDone], still present ?")
+    if (MMisc::does_dir_exists($dsDone));
 }
 
 
 
 ##########
 ## Already in progress ?
-MMisc::ok_quit("${toprint}Run already in progress, Skipping")
+MMisc::ok_quit("${toprint2}Run already in progress, Skipping")
   if (MMisc::does_dir_exists($dsRun));
 
 ##########
 # Actual run
 if ($onlycheck) {
-  vprint("${toprint}Would actually have to run tool, exiting with expected return code ($onlycheck_rc)\n");
+  vprint("${toprint2}Would actually have to run tool, exiting with expected return code ($onlycheck_rc)\n");
   exit($onlycheck_rc);
 }
+
+vprint("%% In progress: $toprint\n");
 
 # In case the user use Ctrl+C do not return "ok"
 sub SIGINTh { MMisc::error_quit("\'Ctrl+C\'-ed, exiting with error status"); }
 $SIG{'INT'} = 'SIGINTh';
 
 vprint("++ Creating \"In Progress\" lock dir");
-MMisc::error_quit("${toprint}Could not create writable dir ($dsRun)")
+#MMisc::error_quit("[$dsRun]");
+MMisc::error_quit("${toprint2}Could not create writable dir ($dsRun)")
   if (! MMisc::make_wdir($dsRun));
-my $flf = "$dsRun/$logfile";
+my $flf = (MMisc::is_blank($rlogfile)) ? "$dsRun/$blogfile" : $rlogfile;
 
 foreach my $ddir (@destdir) {
-  MMisc::error_quit("${toprint}Could not create requested \'CreateDir\' dir ($ddir)")
+  MMisc::error_quit("${toprint2}Could not create requested \'CreateDir\' dir ($ddir)")
     if (! MMisc::make_wdir($ddir));
 }
 
 my ($rv, $tx, $so, $se, $retcode, $flogfile)
-  = MMisc::write_syscall_smart_logfile($flf, @ARGV);
+  = MMisc::write_syscall_logfile
+  ($flf, (defined $executable) ? $executable : @ARGV);
 vprint("-- Final Logfile different from expected one: $flogfile")
   if ($flogfile ne $flf);
 
 if ($retcode == 0) {
   &rod($dsRun, $dsDone); # Move to "ok" status
-  MMisc::ok_quit("${toprint}Run succesfully completed");
+  MMisc::ok_quit("${toprint2}Run succesfully completed");
 }
 
 ## If we are here, it means it was a BAD run
 &rod($dsRun, $dsBad); # Move to "bad" status
 $flogfile =~ s%$dsRun%$dsBad%;
-&error_quit($retcode, "${toprint}Error during run, see logfile ($flogfile)");
+&error_quit($retcode, "${toprint2}Error during run, see logfile ($flogfile)");
 
 ########################################
 
@@ -274,7 +293,7 @@ sub adapt_name {
 sub rod { # rename or die
   my ($e1, $e2) = @_;
 
-  MMisc::error_quit("${toprint}Could not rename [$e1] to [$e2] : $!")
+  MMisc::error_quit("${toprint2}Could not rename [$e1] to [$e2] : $!")
     if (! rename($e1, $e2));
 }
 
@@ -300,9 +319,9 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--Verbose] [--okquit] [--Onlycheck] --lockdir dir --name text [--checkfile file [--checkfile file [...]]] [--badErase]  [--CreateDir dir [--CreateDir dir [...]]] -- command_line_to_run
+$0 [--help | --version] [--Verbose] [--okquit] [--Onlycheck] --lockdir dir --name text [--checkfile file [--checkfile file [...]]] [--badErase]  [--CreateDir dir [--CreateDir dir [...]]] [--LogFile file] [[--executable file] | [ -- command_line_to_run]]
 
-Will execute command_line_to_run if it can be run (not already in progress, completed, bad)
+Will execute 'executable' or command_line_to_run if it can be run (not already in progress, completed, bad)
 
 Where:
   --help     This help message
@@ -315,6 +334,8 @@ Where:
   --checkfile  check file when a succesful run is present to decide if a re-run is necessary, comparing date of files to that of logfile
   --badErase   If a bad run is present, erase run and retry
   --CreateDir  Before (and only if) running the command line to run, create the required directory
+  --LogFile   Override the default location of the log file (inside the lock directory)
+  --executable  executable file to run
 EOF
 ;
 
