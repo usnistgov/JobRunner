@@ -103,29 +103,23 @@ my @destdir = ();
 my $onlycheck = 0;
 my $executable = undef;
 my $rlogfile = "";
+my $outconf = "";
+my $dirchange = "";
+
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:   C        L  O      V     bc e  h   l no      v      #
+# Used:   C        L  O      V     bcde  h   l no  rs uv      #
 
-my %opt = ();
-GetOptions
-  (
-   \%opt,
-   'help',
-   'version',
-   'lockdir=s'   => \$blockdir,
-   'checkfile=s' => \@checkfiles,
-   'name=s'      => \$toprint,
-   'Verbose'     => \$verb,
-   'badErase'    => \$redobad,
-   'okquit'      => \$okquit,
-   'CreateDir=s' => \@destdir,
-   'OnlyCheck'   => \$onlycheck,
-   'executable=s' => \$executable,
-   'LogFile=s'   => \$rlogfile,
-  ) or MMisc::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
-MMisc::ok_quit("\n$usage\n") if ($opt{'help'});
-MMisc::ok_quit("$versionid\n") if ($opt{'version'});
+my @cc = ();
+&process_options();
+
+if (! MMisc::is_blank($dirchange)) {
+  my $err = MMisc::check_dir_r($dirchange);
+  MMisc::error_quit("Problem with \'dirChange\' directory ($dirchange): $err")
+    if (! MMisc::is_blank($err));
+  chdir($dirchange);
+  MMisc::warn_print("Current directory changed to \'$dirchange\'");
+}
 
 # Remaining of command line is the command to start
 MMisc::error_quit("\'executable\' and command line can not be used at the same time")
@@ -173,6 +167,15 @@ foreach my $file (@checkfiles) {
   my $err = MMisc::check_file_r($file);
   MMisc::error_quit("Problem with \'checkfiles\' [$file] : $err")
       if (! MMisc::is_blank($err));
+}
+
+if (! MMisc::is_blank($outconf)) {
+  push @cc, @ARGV;
+  MMisc::error_quit("Problem writing configuration file ($outconf)")
+    if (! MMisc::dump_memory_object($outconf, "", \@cc,
+                                    "# Job Runner Configuration file\n\n",
+                                    undef, 0));
+  MMisc::ok_quit("Wrote \'saveConfig\' file ($outconf)");
 }
 
 my $toprint2 = (! MMisc::is_blank($toprint)) ? "$toprint -- " : ""; 
@@ -314,6 +317,55 @@ sub error_quit {
 }
 
 ########################################
+
+sub _cc1 { push @cc, "--" . $_[0]; }
+sub _cc2 { push @cc, "--" . $_[0]; push @cc, $_[1]; } 
+
+#####
+
+sub process_options {
+  my %opt = ();
+
+  GetOptions
+    (
+     \%opt,
+     'help',
+     'version',
+     'lockdir=s'   => sub {$blockdir = $_[1]; &_cc2(@_);},
+     'checkfile=s' => sub {push @checkfiles, $_[1]; &_cc2(@_);},
+     'name=s'      => sub {$toprint = $_[1]; &_cc2(@_)},
+     'Verbose'     => sub {$verb++; &_cc1(@_);},
+     'badErase'    => sub {$redobad++; &_cc1(@_);},
+     'okquit'      => sub {$okquit++; &_cc1(@_);},
+     'CreateDir=s' => sub {push @destdir, $_[1]; &_cc2(@_);},
+     'OnlyCheck'   => \$onlycheck,
+     'executable=s' => sub {$executable = $_[1]; &_cc2(@_);},
+     'LogFile=s'   => sub {$rlogfile = $_[1]; &_cc2(@_);},
+     'saveConfig=s' => \$outconf,
+     'useConfig=s'  => sub {&load_options($_[1]);},
+     'dirChange=s'  => sub {$dirchange = $_[1]; &_cc2(@_);},
+    ) or MMisc::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
+  MMisc::ok_quit("\n$usage\n") if ($opt{'help'});
+  MMisc::ok_quit("$versionid\n") if ($opt{'version'});
+}
+
+#####
+
+sub load_options {
+  my ($conf) = @_;
+
+  my $err = MMisc::check_file_r($conf);
+  MMisc::error_quit("Problem with \'useConfig\' file ($conf): $err")
+    if (! MMisc::is_blank($err));
+
+  my $tmp = undef;
+  $tmp = MMisc::load_memory_object($conf);
+  MMisc::error_quit("Problem with configuration file data ($conf)")
+    if (! defined $tmp);
+  push @ARGV, @$tmp;
+}
+
+#####
 
 sub set_usage {  
   my $tmp=<<EOF
