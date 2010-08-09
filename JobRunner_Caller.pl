@@ -86,17 +86,21 @@ Getopt::Long::Configure(qw(auto_abbrev no_ignore_case));
 ########################################
 # Options processing
 
-my $sleepv = 60;
+my $dsleepv = 60;
 
 my $usage = &set_usage();
 MMisc::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:                                  h             vw     #
+# Used:                                  h          s  vw     #
 
-my @watchdir = ();
 my $toolb = "JobRunner";
 my $tool = (exists $ENV{$f4b}) ? MMisc::cmd_which($toolb) : "./$toolb.pl";
+my @watchdir = ();
+my $sleepv = $dsleepv;
+my $retryall = 0;
+my $verb = 1;
+
 my %opt = ();
 GetOptions
   (
@@ -105,6 +109,9 @@ GetOptions
    'version',
    'JobRunner=s' => \$tool,
    'watchdir=s' => \@watchdir,
+   'sleep=i'    => \$sleepv,
+   'retryall'   => \$retryall,
+   'quiet'      => sub {$verb = 0},
   ) or MMisc::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 MMisc::ok_quit("\n$usage\n") if ($opt{'help'});
 MMisc::ok_quit("$versionid\n") if ($opt{'version'});
@@ -118,17 +125,21 @@ MMisc::error_quit("Problem with \'$toolb\' tool ($tool): $err")
 my $kdi = scalar @watchdir; # keep doing it
 
 my %alldone = ();
-my $todo = 0;
-my $done = 0;
+my %todo = ();
+my %done = ();
+my $todoc = 0;
+my $donec = 0;
 
+my %allsetsdone = ();
 my $set = 1;
 
 do {
-  my @todo = ();
+  my @tobedone = ();
+  %alldone = () if ($retryall);
 
   foreach my $file (@ARGV) {
     next if (exists $alldone{$file});
-    push @todo, $file;
+    push @tobedone, $file;
   }
 
   foreach my $dir (@watchdir) {
@@ -139,22 +150,24 @@ do {
     foreach my $file (@in) {
       my $ff = "$dir/$file";
       next if (exists $alldone{$ff});
-      push @todo, $ff;
+      push @tobedone, $ff;
     }
   }
 
-  foreach my $jrc (@todo) {
+  foreach my $jrc (@tobedone) {
     next if (exists $alldone{$jrc});
 
-    $todo++;
+    $todo{$jrc}++;
 
     my ($ok, $txt) = &doit($jrc);
-
-    print "$txt\n";
-    $done += $ok;
+    print "$txt\n" if (! MMisc::is_blank($txt));
+    
+    $done{$jrc}++ if ($ok);
   }
-
-  print "\n\n%%%%%%%%%% Set " . $set++ . " run results: $done / $todo %%%%%%%%%%\n";
+  
+  $todoc = scalar(keys %todo);
+  $donec = scalar(keys %done);
+  print "\n\n%%%%%%%%%% Set " . $set++ . " run results: $donec / $todoc %%%%%%%%%%\n";
 
   if ($kdi) {
     print " (waiting $sleepv seconds)\n";
@@ -163,43 +176,55 @@ do {
 
 } while ($kdi);
 
-MMisc::ok_quit("Done ($done / $todo)\n");
+MMisc::ok_quit("Done ($donec / $todoc)\n");
 
 ########################################
 
 sub doit {
   my ($jrc) = @_;
 
-  # whatever happens here after, we will not redo this entry
+  # whatever happens here after, we will not redo this entry (at least this set)
   $alldone{$jrc}++;
-  
-  print "\n\n[**] Job Runner Config: \'$jrc\'\n";
+  $allsetsdone{$jrc}++; # if > 1 it means we have already done it in the past
+  # and therefore do not print "skip" info anymore
+
+  my $header = "\n\n[**] Job Runner Config: \'$jrc\'";
+
   my $err = MMisc::check_file_r($jrc);
-  return(0, "  !! Skipping -- Problem with file ($jrc): $err")
-    if (! MMisc::is_blank($err));
+  return(0, 
+         ($allsetsdone{$jrc} < 2) 
+         ? "$header\n  !! Skipping -- Problem with file ($jrc): $err"
+         : "") if (! MMisc::is_blank($err));
   
   $err = &check_header($jrc);
-  return(0, "  -- Skipping -- $err")
-    if (! MMisc::is_blank($err));
+  return(0,
+         ($allsetsdone{$jrc} < 2)
+         ? "$header\n  -- Skipping -- $err"
+         : "") if (! MMisc::is_blank($err));
 
   my $jb_cmd = "$tool -u $jrc";
 
   my $tjb_cmd = "$jb_cmd -O";
   my ($rc, $so, $se) = MMisc::do_system_call($tjb_cmd);
 
-  return(1, "  @@ Can be skipped\n$so")
-    if ($rc == 0);
-
-  return(1, "  ?? Possible Problem\n$so\n$se")
-    if ($rc == 1);
+  return(1,
+         ($allsetsdone{$jrc} < 2)
+         ? ("$header\n  @@ Can be skipped" . ($verb ? "\n(stdout)$so" : ""))
+         : "") if ($rc == 0);
+  
+  return(1, "$header\n  ?? Possible Problem" . 
+         ($verb ? "\n(stdout)$so\n(stderr)$se" : "")) if ($rc == 1);
 
   ## To be run ? run it !
+  # and now really print the header
+  print "$header\n";
+
   my ($rc, $so, $se) = MMisc::do_system_call($jb_cmd);
   
-  return(1, "  ++ Job completed\n$so")
+  return(1, "  ++ Job completed" . ($verb ? "\n(stdout)$so" : ""))
     if ($rc == 0);
   
-  return(0, "  -- ERROR Run\n$so\n$se");
+  return(0, "  -- ERROR Run" . ($verb ? "\n(stdout)$so\n(stderr)$se" : ""));
 }
 
 #####
@@ -229,18 +254,21 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--JobRunner executable] [--watchdir dir [--watchdir dir]] [JobRunner_configfile [JobRunner_configfile [...]]]
+$0 [--help | --version] [--JobRunner executable] [--quiet] [--watchdir dir [--watchdir dir [...]] [--sleep seconds] [--retryall]] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
 Where:
-  --help     This help message
-  --version  Version information
+  --help       This help message
+  --version    Version information
   --JobRunner  Location of executable tool (if not in PATH)
+  --quiet      Do not print stdout/stderr data from system calls
   --watchdir   Directory to look for configuration files [*]
+  --sleep      Specify the sleep time in between sets
+  --retryall   When running a different set, retry all previously completed entries (especially useful when when a JobRunner configuration uses \'--badErase\' or \'--RunIfTrue\')
 
+*: in this mode, the program will complete a full run then on the files found in this directory, then sleep $dsleepv seconds before re-reading the directory content and see if any new configuration file is present, before running it. The program will never stop, it is left to the user to stop the program.
 
-*: in this mode, the program will complete a full run then on the files found in this directory, then sleep $sleepv seconds before re-reading the directory content and see if any new configuration file is present, before running it. The program will never stop, it is left to the user to stop the program.
 
 EOF
 ;
