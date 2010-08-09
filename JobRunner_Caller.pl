@@ -86,12 +86,15 @@ Getopt::Long::Configure(qw(auto_abbrev no_ignore_case));
 ########################################
 # Options processing
 
+my $sleepv = 60;
+
 my $usage = &set_usage();
 MMisc::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:                                  h             v      #
+# Used:                                  h             vw     #
 
+my @watchdir = ();
 my $toolb = "JobRunner";
 my $tool = (exists $ENV{$f4b}) ? MMisc::cmd_which($toolb) : "./$toolb.pl";
 my %opt = ();
@@ -101,6 +104,7 @@ GetOptions
    'help',
    'version',
    'JobRunner=s' => \$tool,
+   'watchdir=s' => \@watchdir,
   ) or MMisc::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 MMisc::ok_quit("\n$usage\n") if ($opt{'help'});
 MMisc::ok_quit("$versionid\n") if ($opt{'version'});
@@ -111,56 +115,94 @@ my $err = MMisc::check_file_x($tool);
 MMisc::error_quit("Problem with \'$toolb\' tool ($tool): $err")
   if (! MMisc::is_blank($err));
 
+my $kdi = scalar @watchdir; # keep doing it
 
+my %alldone = ();
 my $todo = 0;
 my $done = 0;
-foreach my $jrc (@ARGV) {
-  $todo++;
+
+my $set = 1;
+
+do {
+  my @todo = ();
+
+  foreach my $file (@ARGV) {
+    next if (exists $alldone{$file});
+    push @todo, $file;
+  }
+
+  foreach my $dir (@watchdir) {
+    my $err = MMisc::check_dir_r($dir);
+    MMisc::error_quit("Problem with directory ($dir): $err")
+      if (! MMisc::is_blank($err));
+    my @in = MMisc::get_files_list($dir);
+    foreach my $file (@in) {
+      my $ff = "$dir/$file";
+      next if (exists $alldone{$ff});
+      push @todo, $ff;
+    }
+  }
+
+  foreach my $jrc (@todo) {
+    next if (exists $alldone{$jrc});
+
+    $todo++;
+
+    my ($ok, $txt) = &doit($jrc);
+
+    print "$txt\n";
+    $done += $ok;
+  }
+
+  print "\n\n%%%%%%%%%% Set " . $set++ . " run results: $done / $todo %%%%%%%%%%\n";
+
+  if ($kdi) {
+    print " (waiting $sleepv seconds)\n";
+    sleep($sleepv);
+  }
+
+} while ($kdi);
+
+MMisc::ok_quit("Done ($done / $todo)\n");
+
+########################################
+
+sub doit {
+  my ($jrc) = @_;
+
+  # whatever happens here after, we will not redo this entry
+  $alldone{$jrc}++;
+  
   print "\n\n[**] Job Runner Config: \'$jrc\'\n";
   my $err = MMisc::check_file_r($jrc);
-  if (! MMisc::is_blank($err)) {
-    print "  !! Skipping -- Problem with file ($jrc): $err\n";
-    next;
-  }
+  return(0, "  !! Skipping -- Problem with file ($jrc): $err")
+    if (! MMisc::is_blank($err));
   
   $err = &check_header($jrc);
-  if (! MMisc::is_blank($err)) {
-    print "  -- Skipping -- $err\n";
-    next;
-  }
+  return(0, "  -- Skipping -- $err")
+    if (! MMisc::is_blank($err));
 
   my $jb_cmd = "$tool -u $jrc";
 
   my $tjb_cmd = "$jb_cmd -O";
   my ($rc, $so, $se) = MMisc::do_system_call($tjb_cmd);
-  
-  if ($rc == 0) {
-    print  "  @@ Can be skipped\n$so\n";
-    $done++;
-    next;
-  }
-  
-  if ($rc == 1) {
-    print "  ?? Possible Problem\n$so\n$se\n";
-    $done++;
-    next;
-  }
+
+  return(1, "  @@ Can be skipped\n$so")
+    if ($rc == 0);
+
+  return(1, "  ?? Possible Problem\n$so\n$se")
+    if ($rc == 1);
 
   ## To be run ? run it !
   my ($rc, $so, $se) = MMisc::do_system_call($jb_cmd);
   
-  if ($rc == 0) {
-    print  "  ++ Job completed\n$so\n";
-    $done++;
-    next;
-  }
+  return(1, "  ++ Job completed\n$so")
+    if ($rc == 0);
   
-  print "  -- ERROR Run\n$so\n$se\n";
+  return(0, "  -- ERROR Run\n$so\n$se");
 }
 
-MMisc::ok_quit("Done ($done / $todo)\n");
-
-########################################
+#####
 
 sub check_header {
   my $jrc = $_[0];
@@ -172,7 +214,7 @@ sub check_header {
   chomp $header;
   close FILE;
   
-  print "[$header]\n";
+#  print "[$header]\n";
   return("File header is not the expected text")
     if ($header ne "# Job Runner Configuration file");
 
@@ -187,7 +229,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--JobRunner executable] JobRunner_configfile [JobRunner_configfile [...]] 
+$0 [--help | --version] [--JobRunner executable] [--watchdir dir [--watchdir dir]] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
@@ -195,6 +237,11 @@ Where:
   --help     This help message
   --version  Version information
   --JobRunner  Location of executable tool (if not in PATH)
+  --watchdir   Directory to look for configuration files [*]
+
+
+*: in this mode, the program will complete a full run then on the files found in this directory, then sleep $sleepv seconds before re-reading the directory content and see if any new configuration file is present, before running it. The program will never stop, it is left to the user to stop the program.
+
 EOF
 ;
 
