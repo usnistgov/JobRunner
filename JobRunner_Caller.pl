@@ -100,6 +100,8 @@ my @watchdir = ();
 my $sleepv = $dsleepv;
 my $retryall = 0;
 my $verb = 1;
+my $random = undef;
+my $sibj = 0;
 
 my %opt = ();
 GetOptions
@@ -112,6 +114,8 @@ GetOptions
    'sleep=i'    => \$sleepv,
    'retryall'   => \$retryall,
    'quiet'      => sub {$verb = 0},
+   'RandomOrder:-99' => \$random,
+   'SleepInBetweenJobs=i' => \$sibj,
   ) or MMisc::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 MMisc::ok_quit("\n$usage\n") if ($opt{'help'});
 MMisc::ok_quit("$versionid\n") if ($opt{'version'});
@@ -121,6 +125,20 @@ MMisc::error_quit("Problem with \'$toolb\' tool ($tool): not found")
 my $err = MMisc::check_file_x($tool);
 MMisc::error_quit("Problem with \'$toolb\' tool ($tool): $err")
   if (! MMisc::is_blank($err));
+
+MMisc::error_quit("\SleepInBetweenJobs\' values must be positive ($sibj)")
+  if ($sibj < 0);
+
+my $randi = 0;
+my $rands = 0;
+my @randa = ();
+if (defined $random) {
+  $random = time() if ($random == -99);
+  srand($random);
+  # just to be safe (if anything were to use "rand()" it would change the order)
+  # -> get 10K entries in advance
+  set_randa(10000);
+}
 
 my $kdi = scalar @watchdir; # keep doing it
 
@@ -154,15 +172,23 @@ do {
     }
   }
 
+  if (defined $random) {
+    @tobedone = sort _rand @tobedone;
+  }
+
   foreach my $jrc (@tobedone) {
     next if (exists $alldone{$jrc});
 
     $todo{$jrc}++;
 
-    my ($ok, $txt) = &doit($jrc);
+    my ($ok, $txt, $ds) = &doit($jrc);
     print "$txt\n" if (! MMisc::is_blank($txt));
     
     $done{$jrc}++ if ($ok);
+    if (($ds) && ($sibj)) {
+      print " (waiting $sleepv seconds)\n";
+      sleep($sibj);
+    }
   }
   
   $todoc = scalar(keys %todo);
@@ -194,13 +220,13 @@ sub doit {
   return(0, 
          ($allsetsdone{$jrc} < 2) 
          ? "$header\n  !! Skipping -- Problem with file ($jrc): $err"
-         : "") if (! MMisc::is_blank($err));
+         : "", 0) if (! MMisc::is_blank($err));
   
   $err = &check_header($jrc);
   return(0,
          ($allsetsdone{$jrc} < 2)
          ? "$header\n  -- Skipping -- $err"
-         : "") if (! MMisc::is_blank($err));
+         : "", 0) if (! MMisc::is_blank($err));
 
   my $jb_cmd = "$tool -u $jrc";
 
@@ -210,10 +236,10 @@ sub doit {
   return(1,
          ($allsetsdone{$jrc} < 2)
          ? ("$header\n  @@ Can be skipped" . ($verb ? "\n(stdout)$so" : ""))
-         : "") if ($rc == 0);
+         : "", 0) if ($rc == 0);
   
   return(1, "$header\n  ?? Possible Problem" . 
-         ($verb ? "\n(stdout)$so\n(stderr)$se" : "")) if ($rc == 1);
+         ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 0) if ($rc == 1);
 
   ## To be run ? run it !
   # and now really print the header
@@ -221,10 +247,10 @@ sub doit {
 
   my ($rc, $so, $se) = MMisc::do_system_call($jb_cmd);
   
-  return(1, "  ++ Job completed" . ($verb ? "\n(stdout)$so" : ""))
+  return(1, "  ++ Job completed" . ($verb ? "\n(stdout)$so" : ""), 1)
     if ($rc == 0);
   
-  return(0, "  -- ERROR Run" . ($verb ? "\n(stdout)$so\n(stderr)$se" : ""));
+  return(0, "  -- ERROR Run" . ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 1);
 }
 
 #####
@@ -246,7 +272,34 @@ sub check_header {
   return("");
 }
 
+##########
 
+sub set_randa {
+  for (my $i = 0; $i < $_[0]; $i++) {
+    push @randa, rand();
+  }
+  $rands = scalar @randa;
+}
+
+#####
+
+sub get_rand {
+  MMisc::error_quit("Can not get pre computed rand() value from array (no content)")
+    if ($rands == 0);
+  my $mul = (defined $_[0]) ? $_[0] : 1;
+  my $v = $mul * $randa[$randi];
+  $randi++;
+  $randi = 0 if ($randi >= $rands);
+  return($v);
+}
+
+#####
+
+sub _num { $a <=> $b; }
+
+##
+
+sub _rand { &get_rand(100) <=> &get_rand(100); }
 
 ########################################
 
@@ -254,7 +307,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--JobRunner executable] [--quiet] [--watchdir dir [--watchdir dir [...]] [--sleep seconds] [--retryall]] [JobRunner_configfile [JobRunner_configfile [...]]]
+$0 [--help | --version] [--JobRunner executable] [--quiet] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--sleep seconds] [--retryall] [--RandomOrder [seed]]] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
@@ -263,9 +316,11 @@ Where:
   --version    Version information
   --JobRunner  Location of executable tool (if not in PATH)
   --quiet      Do not print stdout/stderr data from system calls
+  --SleepInBetweenJobs  Specify the number of seconds to sleep in between two consecutive jobs (example: when a job check the system load before running using JobRunner\'s \'--RunIfTrue\', this allow the load to drop some) (default is not to sleep)
   --watchdir   Directory to look for configuration files [*]
   --sleep      Specify the sleep time in between sets
   --retryall   When running a different set, retry all previously completed entries (especially useful when when a JobRunner configuration uses \'--badErase\' or \'--RunIfTrue\')
+  --RandomOrder  Run jobs in random order instead of the order they are provided (can help with multiple lock dir access over NFS if the data is not propagated from server yet) (note: if providing a random seed --which must be over 0-- use different values for multiple JobRunner_Caller, or simply do not provide any and the current \'time\' value will be used)
 
 *: in this mode, the program will complete a full run then on the files found in this directory, then sleep $dsleepv seconds before re-reading the directory content and see if any new configuration file is present, before running it. The program will never stop, it is left to the user to stop the program.
 
