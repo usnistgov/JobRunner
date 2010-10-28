@@ -106,12 +106,18 @@ my $rlogfile = "";
 my $outconf = "";
 my $dirchange = "";
 my @runiftrue = ();
+my @predir = ();
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:   C        L  O  R   V     bcde  h   l no  rs uv      #
+# Used:   C        L  O  R   V     bcde  h   l nop rs uv      #
 
 my @cc = ();
 &process_options();
+
+foreach my $ddir (@predir) {
+  MMisc::error_quit("Could not create requested \'preCreateDir\' dir ($ddir)")
+    if (! MMisc::make_wdir($ddir));
+}
 
 if (! MMisc::is_blank($dirchange)) {
   my $err = MMisc::check_dir_r($dirchange);
@@ -363,6 +369,7 @@ sub process_options {
      'badErase'    => sub {$redobad++; &_cc1(@_);},
      'okquit'      => sub {$okquit++; &_cc1(@_);},
      'CreateDir=s' => sub {push @destdir, $_[1]; &_cc2(@_);},
+     'preCreateDir=s' => sub {push @predir, $_[1]; &_cc2(@_);},
      'OnlyCheck'   => \$onlycheck,
      'executable=s' => sub {$executable = $_[1]; &_cc2(@_);},
      'LogFile=s'   => sub {$rlogfile = $_[1]; &_cc2(@_);},
@@ -397,7 +404,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--Verbose] [--okquit] [--Onlycheck] [--dirChange dir] --lockdir dir --name text [--checkfile file [--checkfile file [...]]] [--badErase]  [--CreateDir dir [--CreateDir dir [...]]] [--RunIfTrue executable [--RunIfTrue executable]] [--LogFile file] [[--executable file] | [ -- command_line_to_run]] [--saveConfig file | --useConfig file]
+$0 [--help | --version] [--Verbose] [--okquit] [--Onlycheck] [--dirChange dir] --lockdir dir --name text [--checkfile file [--checkfile file [...]]] [--badErase] [--preCreateDir dir [--preCreateDir dir [...]]] [--CreateDir dir [--CreateDir dir [...]]] [--RunIfTrue executable [--RunIfTrue executable]] [--LogFile file] [[--executable file] | [ -- command_line_to_run]] [--saveConfig file | --useConfig file]
 
 Will execute 'executable' or command_line_to_run if it can be run (not already in progress, completed, bad)
 
@@ -406,12 +413,13 @@ Where:
   --version  Version information
   --Verbose  Print more verbose status updates
   --Onlycheck  Do the entire check list but before doing the actual run, exit with a return code value of \"$onlycheck_rc\" (reminder: 1 means that there was an issue, 0 means that the program exited succesfuly, ie in this case a previous run completed -- it can still be a bad run, use \'--badErase\' to insure redoing those)
-  --dirChange  Before doing anything else, change to the specified directory (ie relative path provided have to be from that directory)
+  --dirChange  Before doing anything else (except for \'preCreateDir\'), change to the specified directory (ie relative path provided have to be from that directory)
   --okquit   In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
   --lockdir  base lock directory in which is stored the commandline and logfile
   --name     name (converted adapted) to the base lock directory
   --checkfile  check file when a succesful run is present to decide if a re-run is necessary, comparing date of files to that of logfile
   --badErase   If a bad run is present, erase run and retry
+  --preCreateDir  Before \'dirChange\', create the required writable directory. Note that this is done before any checks and as such should be used with caution.
   --CreateDir  Before (and only if) running the command line to run, create the required directory
   --RunIfTrue  Check that given program (no arguments accepted) returns true (0 exit status) to run job, otherwise do not run job (will still be available for later rerun)
   --LogFile   Override the default location of the log file (inside the lock directory)
