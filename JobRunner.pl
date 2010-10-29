@@ -114,6 +114,15 @@ my @predir = ();
 my @cc = ();
 &process_options();
 
+if (! MMisc::is_blank($outconf)) {
+  push @cc, @ARGV;
+  MMisc::error_quit("Problem writing configuration file ($outconf)")
+    if (! MMisc::dump_memory_object($outconf, "", \@cc,
+                                    "# Job Runner Configuration file\n\n",
+                                    undef, 0));
+  MMisc::ok_quit("Wrote \'saveConfig\' file ($outconf)");
+}
+
 foreach my $ddir (@predir) {
   MMisc::error_quit("Could not create requested \'preCreateDir\' dir ($ddir)")
     if (! MMisc::make_wdir($ddir));
@@ -180,15 +189,6 @@ foreach my $file (@checkfiles) {
   my $err = MMisc::check_file_r($file);
   MMisc::error_quit("Problem with \'checkfiles\' [$file] : $err")
       if (! MMisc::is_blank($err));
-}
-
-if (! MMisc::is_blank($outconf)) {
-  push @cc, @ARGV;
-  MMisc::error_quit("Problem writing configuration file ($outconf)")
-    if (! MMisc::dump_memory_object($outconf, "", \@cc,
-                                    "# Job Runner Configuration file\n\n",
-                                    undef, 0));
-  MMisc::ok_quit("Wrote \'saveConfig\' file ($outconf)");
 }
 
 my $toprint2 = (! MMisc::is_blank($toprint)) ? "$toprint -- " : ""; 
