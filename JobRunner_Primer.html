@@ -1,0 +1,263 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+<head>
+<meta content="text/html; charset=ISO-8859-1" http-equiv="Content-Type">
+<title>TRECVID MED11 Scoring Primer</title>
+<style type="text/css">
+  body { counter-reset: chapter; }
+  h2:before { content: counter(chapter) ". "; counter-increment: chapter;  /* Add 1 to chapter */ }
+  h2 { counter-reset: section subsection; /* Set section to 0 */ }
+  h3:before { content: counter(chapter) "." counter(section) " "; counter-increment: section; }
+  h3 { counter-reset: subsection; }
+  h4:before { content: counter(chapter) "." counter(section) "." counter(subsection) " "; counter-increment: subsection; }
+  a {text-decoration:none}
+  pre { border-style: solid; border-width: 1px; margin-left: 5px; padding: 2px 2px 2px 2px; background-color: #DDDDDD; 
+/* from: http://forums.techguy.org/web-design-development/249849-forcing-long-text-lines-wrap.html */
+white-space: -moz-pre-wrap; /* Mozilla, supported since 1999 */
+white-space: -pre-wrap; /* Opera 4 - 6 */
+white-space: -o-pre-wrap; /* Opera 7 */
+white-space: pre-wrap; /* CSS3 - Text module (Candidate Recommendation) http://www.w3.org/TR/css3-text/#white-space */
+word-wrap: break-word; /* IE 5.5+ */
+}
+</style>
+</head>
+<body>
+
+
+<div style="text-align: center;"><big><big><big>JobRunner Primer</big></big></big><br>
+</div>
+<div style="text-align: center;"><small>Last modified: June 28th, 2011</small><br>
+</div>
+ <br>
+
+
+<h2>Description</h2>
+
+<b>JobRunner</b> is a tool designed to <i>run</i> a <i>job</i>, ie to
+execute a command line or script that does not require user
+interaction, and take care of storing the
+program's output (standard error and standard out) in an easy to read
+log file. The tool is able to save <i>configuration files</i> (or
+"<i>job description</i>") of the <i>job</i> to be run.<br>
+<br>
+<b>JobRunner_Caller</b> is a tool designed to <i>call</i>
+<b>JobRunner</b>'s <i>configuration files</i>, acting as a <i>queue
+processor</i>.<br>
+<br>
+The tools were designed to work using directory lock mechanism instead
+of relying on a central networked server to dispatch jobs and aggregate
+log and job status information from networked clients.
+
+<a name="JobRunner">
+<h2>JobRunner</h2>
+</a>
+
+<h3>Command line options</h3>
+
+<pre>
+JobRunner [common_options] --lockdir ldir --name jobid --executable script
+  or
+JobRunner [common_options] --lockdir ldir --name jobid -- command_line_to_run
+
+if it can be run (not already in progress, completed, bad), will either run the executable script or command_line_to_run 
+
+Where [common_options] are:
+
+[--help | --version] [--Verbose] [--okquit] [--Onlycheck] [--dirChange dir] [--goRunInLock] [--checkfile file [--checkfile file [...]]] [--badErase] [--preCreateDir dir [--preCreateDir dir [...]]] [--CreateDir dir [--CreateDir dir [...]]] [--RunIfTrue executable [--RunIfTrue executable]] [--LogFile file] [--DonePostRun command] [--ErrorPostRun command] [--saveConfig file | --useConfig file]
+
+
+such as:
+
+  --lockdir  base lock directory, used to create the actual lock directory, in which is stored the logfile
+  --name     the unique ID (text value) representing one's job
+
+  --executable  executable file to run
+
+  --help     This help message
+  --version  Version information
+  --Verbose  Print more verbose status updates
+  --Onlycheck  Do the entire check list but before doing the actual run, exit with a return code value of "2" (reminder: 1 means that there was an issue, 0 means that the program exited succesfuly, ie in this case a previous run completed --it can still be a bad run, use '--badErase' to insure redoing those)
+  --dirChange  Before doing anything else (except for 'preCreateDir'), change to the specified directory (ie relative path provided have to be from that directory)
+  --goRunInLock  Just before doing the \'CreateDir\' and running the job, change to the actual lock directory
+  --okquit   In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
+  --checkfile  check file when a succesful run is present to decide if a re-run is necessary, comparing date of files to that of logfile
+  --badErase   If a bad run is present, erase run and retry
+  --preCreateDir  Before 'dirChange', create the required writable directory. Note that this is done before any checks and as such should be used with caution.
+  --CreateDir  Before (and only if) running the command line to run, create the required directory
+  --RunIfTrue  Check that given program (no arguments accepted) returns true (0 exit status) to run job, otherwise do not run job (will still be available for later rerun)
+  --LogFile   Override the default location of the log file (inside the lock directory)
+  --DonePostRun  If the executable or run command exited succesfully, exit 'dirChange' (if specified) and run specified command
+  --ErrorPostRun  If the executable or run command exited with error, exit 'dirChange' (if specified) and run specified command
+  --saveConfig  Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using '--useConfig'
+  --useConfig   Use one (and only one) JobRunner configuration files generated by '--saveConfig'. To run on multiple files, use 'JobRunner_Caller'.
+</pre>
+
+<h3>Simple Job</h3>
+
+In its simplest form, the tool is run either as:
+<pre>
+JobRunner --lockdir ldir --name jobid -- commandline
+</pre>
+or
+<pre>
+JobRunner --lockdir ldir --name jobid --executable script
+</pre>
+
+The first form use the information on the commandline as the <i>job</i>
+<i>command</i>.
+The second form use the <code>script</code> as the <i>job</i> <i>command</i>.
+
+<h3>Job processing</h3>
+
+In order to understand how the tool work, one must understand it use
+of <i>Lock directories</i>.
+
+Those allow for <i>jobs</i> to only be run once and allow
+the user to know the exit status of one's <i>jobs</i> by simply looking at
+the directory name.
+<br>
+They are placed in the
+<code>--lockdir</code> directory and are composed of the
+<code>--name</code>'s reformatted <code>jobid</code> (any character
+that is not <code>a</code> to <code>z</code>, <code>0</code> to <code>9</code>, <code>-</code> or <code>_</code> is replaced by <code>_</code>) followed by five <code>_</code> and
+terminated by a <code>&lt;STATUS&gt;</code> information:
+<pre>
+ldir/jobid_____&lt;STATUS&gt;
+</pre>
+, where <code>&lt;STATUS&gt;</code> is one of:
+<ul>
+  <li> <code>inprogress</code>; the <i>job</i> is currently <i>in
+  progress</i> but has not yet completed,
+  <li> <code>done</code>; the <i>job</i> has completed and the program exited
+  with an <i>ok</i> status (i.e. exited with status code 0), 
+  <li> <code>bad</code>; the <i>job</i> is complete but its program exited
+  with a <i>non ok</i> statys (i.e. exited with a status code
+  different from 0),
+  <li> <code>skip</code>; a special mode in which the <i>job</i> will be
+  bypassed entirely.
+</ul>
+
+When a <b>JobRunner</b> command line is executed:
+
+<ol>
+  <li>If any, do <i>job</i> pre-tasks. In order: <code>preCreatedir</code> directory creation, change
+  to <code>dirChange</code> directory (and store the  <i>starting
+  location</i>), command line options check, check all requested <code>checkfile</code>s
+  existence and bypass the <i>job</i> if any does not exist
+  <li>Insure that the <i>job</i> is available to be run by checking its
+  <i>lock directory</i>:
+  <ol>
+    <li>Check that a given <i>job</i> does not have multiple <i>lock directories</i>, but if
+    that is the case exit in error
+    <li>bypass <i>jobs</i> to be <code>skip</code>-ped
+    <li>bypass completed but <code>bad</code> <i>jobs</i>, unless requested
+    to rerun them (<code>badErase</code>) in which case delete the
+    <code>bad</code> <i>lock directory</i>
+    <li>checking if <code>done</code>'s <i>lock directory</i> log
+    file is present:
+    <ol>
+      <li>if not, consider as a new run, and delete the <code>done</code>
+      <i>lock directory</i>
+      <li>if it is present and none of the requested
+      <code>checkfile</code>s are more recent that the logfile, bypass
+      this <i>job</i>, otherwise delete the <code>done</code>
+      <i>lock directory</i>
+    </ol>
+    <li>bypass if already <code>inprogress</code>
+  </ol>
+  <li>check that all <code>RunIfTrue</code> scripts exit with the
+  <i>ok</i> status before accepting the <i>job</i> as runnable
+  <li>if <code>Onlycheck</code> was requested, exit with special return value 
+  <li>create the <code>inprogress</code> <i>lock directory</i>
+  <li>if any, do the pre-<i>job</i> running task: creating the
+  <code>CreateDir</code> directories.
+  <li>run the <i>job</i>
+  <li>if any <code>dirChange</code> was request go back to the
+  <i>starting location</i>
+  <li>depending on the <i>job</i> exit status:
+  <ul>
+    <li>for <i>ok</i> exit status
+    <ul>
+      <li>if requested, run the <code>DonePostRun</code> script (will
+      only print a warning message if it did not complete with an
+      <i>ok</i> status)
+      <li>rename the <i>lock directory</i> from
+      <code>inprogress</code> to <code>done</code>
+      <li>exit with the <i>ok</i> status
+    </ul>
+    <li>for <i>non ok</i> exit status
+    <ul>
+      <li>if requested, run the <code>ErrorPostRun</code> script (will
+      only print a warning message if it did not complete with an
+      <i>ok</i> status)
+      <li>rename the <i>lock directory</i> from
+      <code>inprogress</code> to <code>bad</code>
+      <li>exit with the <i>non ok</i> status
+    </ul>
+  </ul>
+  </ul>
+</ol>
+
+<h3>A Serie of Examples</h3>
+  
+<h4>"Hello World !"</h4>
+
+After creating our <code>lockdir</code> (<code>JR_lockd</code>):
+<pre>
+% JobRunner --lockdir JR_lockd --name test -- echo \"hello world \!\"
+test -- Job succesfully completed
+</pre>
+
+<b>JobRunner</b> informs us that the <i>job</i> named
+<code>test</code> is <i>succesfully completed</i>.
+This is easily confirmed by confirming the expected <i>lock
+directory</i>'s existence (<code>JR_lockd/test_____done</code>) that
+only contains the <code>logfile</code> whose content is as follow:
+<pre>
+[[COMMANDLINE]] echo "Hello World !"
+[[RETURN CODE]] 0
+[[STDOUT]]
+Hello World !
+
+[[STDERR]]
+</pre>
+In it we can see that:
+<ul>
+  <li>the <code>COMMANDLINE</code> ran was <code>echo "Hello World !"</code>
+  <li>the <code>RETURN CODE</code> of the command line execution was
+  <code>0</code>, the <i>ok</i> status
+  <li>the expected result of the command was printed on
+  <code>STDOUT</code>
+  <li>nothing was print on <code>STDERR</code>
+</ul>
+
+Note that since this was provided on the command line, it was
+preferable to escape the <code>&quot;</code> and <code>!</code> to be
+certain the command line ran was as expected.
+<br>
+If we re-run the command again we are told the the <code>test</code>
+<i>job</i> was <code>Previously succesfully completed</code>.
+<pre>
+% JobRunner --lockdir JR_lockd --name test -- echo \"hello world \!\"
+test -- Previously succesfully completed
+</pre> 
+
+If we change the <code>jobid</code> to <code>test2</code>:
+<pre>
+% JobRunner --lockdir JR_lockd --name test2 -- echo \"Hello World \!\"
+test2 -- Job succesfully completed
+</pre>
+we are able to run the same program again, since it is a new
+<code>jobid</code>, and we will now see in the <code>lockdir</code>
+both the <code>test_____done</code> and <code>test2_____done</code> directories.
+
+<h4>"Hello World !" (version 2)</h4>
+
+
+
+<a name="JobRunner_Caller">
+<h2>JobRunner_Caller</h2>
+</a>
+
+</body>
+</html>
