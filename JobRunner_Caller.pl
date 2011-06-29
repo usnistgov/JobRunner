@@ -37,15 +37,6 @@ my $versionid = "JobRunner Caller Version: $version";
 ##########
 # Check we have every module (perl wise)
 
-my ($f4b, @f4bv);
-BEGIN {
-  $f4b = "F4DE_BASE";
-  push @f4bv, (exists $ENV{$f4b}) 
-    ? ($ENV{$f4b} . "/lib") 
-      : ("../../../common/lib");
-}
-use lib (@f4bv);
-
 sub eo2pe {
   my $oe = join(" ", @_);
   return( ($oe !~ m%^Can\'t\s+locate%) ? "\n----- Original Error:\n $oe\n-----" : "");
@@ -53,12 +44,12 @@ sub eo2pe {
 
 ## Then try to load everything
 my $have_everything = 1;
-my $partofthistool = "It should have been part of this tools' files. Please check your $f4b environment variable.";
+my $partofthistool = "It should have been part of this tools' files. ";
 my $warn_msg = "";
 sub _warn_add { $warn_msg .= "[Warning] " . join(" ", @_) ."\n"; }
 
 # Part of this tool
-foreach my $pn ("MMisc") {
+foreach my $pn ("JRHelper") {
   unless (eval "use $pn; 1") {
     my $pe = &eo2pe($@);
     &_warn_add("\"$pn\" is not available in your Perl installation. ", $partofthistool, $pe);
@@ -89,13 +80,14 @@ Getopt::Long::Configure(qw(auto_abbrev no_ignore_case));
 my $dsleepv = 60;
 
 my $usage = &set_usage();
-MMisc::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
+JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
 # Used:                                  h          s  vw     #
 
 my $toolb = "JobRunner";
-my $tool = (exists $ENV{$f4b}) ? MMisc::cmd_which($toolb) : "./$toolb.pl";
+my $tool = JRHelper::cmd_which($toolb);
+$tool = "./$toolb.pl" if (! defined $tool);
 my @watchdir = ();
 my $sleepv = $dsleepv;
 my $retryall = 0;
@@ -116,17 +108,17 @@ GetOptions
    'quiet'      => sub {$verb = 0},
    'RandomOrder:-99' => \$random,
    'SleepInBetweenJobs=i' => \$sibj,
-  ) or MMisc::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
-MMisc::ok_quit("\n$usage\n") if ($opt{'help'});
-MMisc::ok_quit("$versionid\n") if ($opt{'version'});
+  ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
+JRHelper::ok_quit("\n$usage\n") if ($opt{'help'});
+JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
 
-MMisc::error_quit("Problem with \'$toolb\' tool ($tool): not found")
-  if ((! defined $tool) || (! MMisc::does_file_exists($tool)));
-my $err = MMisc::check_file_x($tool);
-MMisc::error_quit("Problem with \'$toolb\' tool ($tool): $err")
-  if (! MMisc::is_blank($err));
+JRHelper::error_quit("Problem with \'$toolb\' tool ($tool): not found")
+  if ((! defined $tool) || (! JRHelper::does_file_exists($tool)));
+my $err = JRHelper::check_file_x($tool);
+JRHelper::error_quit("Problem with \'$toolb\' tool ($tool): $err")
+  if (! JRHelper::is_blank($err));
 
-MMisc::error_quit("\SleepInBetweenJobs\' values must be positive ($sibj)")
+JRHelper::error_quit("\SleepInBetweenJobs\' values must be positive ($sibj)")
   if ($sibj < 0);
 
 my $randi = 0;
@@ -161,10 +153,10 @@ do {
   }
 
   foreach my $dir (@watchdir) {
-    my $err = MMisc::check_dir_r($dir);
-    MMisc::error_quit("Problem with directory ($dir): $err")
-      if (! MMisc::is_blank($err));
-    my @in = MMisc::get_files_list($dir);
+    my $err = JRHelper::check_dir_r($dir);
+    JRHelper::error_quit("Problem with directory ($dir): $err")
+      if (! JRHelper::is_blank($err));
+    my @in = JRHelper::get_files_list($dir);
     foreach my $file (@in) {
       my $ff = "$dir/$file";
       next if (exists $alldone{$ff});
@@ -182,7 +174,7 @@ do {
     $todo{$jrc}++;
 
     my ($ok, $txt, $ds) = &doit($jrc);
-    print "$txt\n" if (! MMisc::is_blank($txt));
+    print "$txt\n" if (! JRHelper::is_blank($txt));
     
     $done{$jrc}++ if ($ok);
     if (($ds) && ($sibj)) {
@@ -202,7 +194,7 @@ do {
 
 } while ($kdi);
 
-MMisc::ok_quit("Done ($donec / $todoc)\n");
+JRHelper::ok_quit("Done ($donec / $todoc)\n");
 
 ########################################
 
@@ -216,22 +208,22 @@ sub doit {
 
   my $header = "\n\n[**] Job Runner Config: \'$jrc\'";
 
-  my $err = MMisc::check_file_r($jrc);
+  my $err = JRHelper::check_file_r($jrc);
   return(0, 
          ($allsetsdone{$jrc} < 2) 
          ? "$header\n  !! Skipping -- Problem with file ($jrc): $err"
-         : "", 0) if (! MMisc::is_blank($err));
+         : "", 0) if (! JRHelper::is_blank($err));
   
   $err = &check_header($jrc);
   return(0,
          ($allsetsdone{$jrc} < 2)
          ? "$header\n  -- Skipping -- $err"
-         : "", 0) if (! MMisc::is_blank($err));
+         : "", 0) if (! JRHelper::is_blank($err));
 
   my $jb_cmd = "$tool -u $jrc";
 
   my $tjb_cmd = "$jb_cmd -O";
-  my ($rc, $so, $se) = MMisc::do_system_call($tjb_cmd);
+  my ($rc, $so, $se) = JRHelper::do_system_call($tjb_cmd);
 
   return(1,
          ($allsetsdone{$jrc} < 2)
@@ -245,7 +237,7 @@ sub doit {
   # and now really print the header
   print "$header\n";
 
-  my ($rc, $so, $se) = MMisc::do_system_call($jb_cmd);
+  my ($rc, $so, $se) = JRHelper::do_system_call($jb_cmd);
   
   return(1, "  ++ Job completed" . ($verb ? "\n(stdout)$so" : ""), 1)
     if ($rc == 0);
@@ -284,7 +276,7 @@ sub set_randa {
 #####
 
 sub get_rand {
-  MMisc::error_quit("Can not get pre computed rand() value from array (no content)")
+  JRHelper::error_quit("Can not get pre computed rand() value from array (no content)")
     if ($rands == 0);
   my $mul = (defined $_[0]) ? $_[0] : 1;
   my $v = $mul * $randa[$randi];
