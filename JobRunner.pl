@@ -77,7 +77,7 @@ Getopt::Long::Configure(qw(auto_abbrev no_ignore_case));
 ########################################
 # Options processing
 
-my $onlycheck_rc = 2;
+my $onlycheck_rc = 99;
 my $usage = &set_usage();
 JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
@@ -100,10 +100,8 @@ my @runiftrue = ();
 my @predir = ();
 my $postrun_Done = "";
 my $postrun_Error = "";
+my $postrun_cd = "";
 my $gril = 0;
-
-# Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:   CDE      L  O  R   V     bcde gh   l nop rs uv      #
 
 my @cc = ();
 &process_options();
@@ -128,7 +126,7 @@ if (! JRHelper::is_blank($dirchange)) {
   JRHelper::error_quit("Problem with \'dirChange\' directory ($dirchange): $err")
     if (! JRHelper::is_blank($err));
   chdir($dirchange);
-  JRHelper::warn_print("Current directory changed to \'$dirchange\'");
+  JRHelper::warn_print("dirChange -- Current directory changed to \'$dirchange\'");
 }
 
 # Remaining of command line is the command to start
@@ -149,10 +147,11 @@ foreach my $rit (@runiftrue) {
     if (! JRHelper::is_blank($err));
 }
 
-
 $blockdir =~ s%\/$%%; # remove trailing /
+$blockdir = JRHelper::get_file_full_path($blockdir, $pwd);
 JRHelper::error_quit("No \'lockdir\' specified, aborting")
   if (JRHelper::is_blank($blockdir));
+#die "[$blockdir]\n";
 
 my $name = &adapt_name($toprint);
 JRHelper::error_quit("No \'name\' specified, aborting")
@@ -273,7 +272,7 @@ my $flf = (JRHelper::is_blank($rlogfile)) ? "$dsRun/$blogfile" : $rlogfile;
 # goRunInLock
 if ($gril) {
   chdir($dsRun);
-  JRHelper::warn_print("Current directory changed to \'$dsRun\'");
+  JRHelper::warn_print("goRunInLock -- Current directory changed to \'$dsRun\'");
 }
 
 # CreateDir
@@ -288,9 +287,9 @@ my ($rv, $tx, $so, $se, $retcode, $flogfile)
 vprint("-- Final Logfile different from expected one: $flogfile")
   if ($flogfile ne $flf);
 
-if ((! JRHelper::is_blank($dirchange)) || ($gril)) {
-  chdir($pwd);
-  JRHelper::warn_print("Current directory changed to \'$pwd\'");
+if (! JRHelper::is_blank($postrun_cd)) {
+  chdir($postrun_cd);
+  JRHelper::warn_print("PostRunChangeDir -- Current directory changed to \'$postrun_cd\'");
 }
 
 if ($retcode == 0) {
@@ -382,6 +381,9 @@ sub _cc2 { push @cc, "--" . $_[0]; push @cc, $_[1]; }
 #####
 
 sub process_options {
+# Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
+# Used:   CDE      L  OP R   V     bcde gh   l nop rs uv      #
+
   my %opt = ();
 
   GetOptions
@@ -406,6 +408,7 @@ sub process_options {
      'RunIfTrue=s'  => sub {push @runiftrue, $_[1]; &_cc2(@_);},
      'DonePostRun=s'  => sub {$postrun_Done  = $_[1]; &_cc2(@_);},
      'ErrorPostRun=s' => sub {$postrun_Error = $_[1]; &_cc2(@_);},
+     'PostRunChangeDir=s' => sub {$postrun_cd = $_[1]; &_cc2(@_);},
      'goRunInLock'    => sub {$gril = 1; &_cc1(@_);},
     ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
   JRHelper::ok_quit("\n$usage\n") if ($opt{'help'});
@@ -434,41 +437,75 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [common_options] --lockdir ldir --name jobid --executable script
+$0 [options] --lockdir ldir --name jobid --executable script
   or
-$0 [common_options] --lockdir ldir --name jobid -- command_line_to_run
+$0 [options] --lockdir ldir --name jobid -- command_line_to_run
 
-if it can be run (not already in progress, completed, bad), will either run the executable script or command_line_to_run 
-
-Where [common_options] are:
-
-[--help | --version] [--Verbose] [--okquit] [--Onlycheck] [--dirChange dir] [--goRunInLock] [--checkfile file [--checkfile file [...]]] [--badErase] [--preCreateDir dir [--preCreateDir dir [...]]] [--CreateDir dir [--CreateDir dir [...]]] [--RunIfTrue executable [--RunIfTrue executable]] [--LogFile file] [--DonePostRun command] [--ErrorPostRun command] [--saveConfig file | --useConfig file]
+if it can be run, will either run the executable script or the command_line_to_run 
 
 
-such as:
 
-  --lockdir  base lock directory, used to create the actual lock directory, in which is stored the logfile
-  --name     the unique ID (text value) representing one\'s job
+Where [options] are split in:
+  required_options [common_options] [step1_options] [step2_options] [step3_options]
 
-  --executable  executable file to run
 
-  --help     This help message
-  --version  Version information
-  --Verbose  Print more verbose status updates
-  --Onlycheck  Do the entire check list but before doing the actual run, exit with a return code value of \"$onlycheck_rc\" (reminder: 1 means that there was an issue, 0 means that the program exited succesfuly, ie in this case a previous run completed --it can still be a bad run, use \'--badErase\' to insure redoing those)
-  --dirChange  Before doing anything else (except for \'preCreateDir\'), change to the specified directory (any relative path provided can then be from that directory)
-  --goRunInLock  Just before doing the \'CreateDir\' and running the job, change to the actual lock directory
-  --okquit   In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
-  --checkfile  check file when a succesful run is present to decide if a re-run is necessary, comparing date of files to that of logfile
-  --badErase   If a bad run is present, erase run and retry
-  --preCreateDir  Before \'dirChange\', create the required writable directory. Note that this is done before any checks and as such should be used with caution.
-  --CreateDir  Before (and only if) running the command line to run, create the required directory
-  --RunIfTrue  Check that given program (no arguments accepted) returns true (0 exit status) to run job, otherwise do not run job (will still be available for later rerun)
-  --LogFile   Override the default location of the log file (inside the lock directory)
-  --DonePostRun  If the executable or run command exited succesfully, exit \'dirChange\' (if specified) and run specified command
-  --ErrorPostRun  If the executable or run command exited with error, exit \'dirChange\' (if specified) and run specified command
-  --saveConfig  Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using \'--useConfig\'
-  --useConfig   Use one (and only one) JobRunner configuration files generated by \'--saveConfig\'. To run on multiple files, use \'JobRunner_Caller\'.
+required_options are:
+  --lockdir ldir
+      base lock directory, used to create the actual lock directory (default location of the logfile)
+  --name jobid
+      the unique ID (text value) representing one\'s job (fixed so that it remove any leading and trailing space, and transforming any characters not a-z, 0-9 or - to _)
+  --executable script
+      executable file to run (only required in non \'command_line_to_run\' mode)
+
+
+[common_options] apply to any step, and are:
+  --help
+      This help message. For more help and examples, please look at the Primer that should have been included in the source archive of the tool
+  --version
+      Version information
+  --Verbose
+      Print more verbose status updates
+  --okquit
+      In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
+  --saveConfig file
+      Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using \'--useConfig\'
+  --useConfig file
+      Use one (and only one) JobRunner configuration files generated by \'--saveConfig\'. To run on multiple files, use \'JobRunner_Caller\'.
+
+
+[step1_options] are any options that take effect before the lock is made, and are (in order of use):
+  --preCreateDir dir [--preCreateDir dir [...]] 
+      Create the specified writable directory if it does not exist. Note that this is done before any checks and as such should be used with caution.
+  --dirChange dir
+      Go to the specified directory
+  --LogFile file
+      Override the default location of the log file (inside the run lock directory). Use this option with caution since it will influence the behavior of \'checkfile\'
+  --checkfile file [--checkfile file [...]]
+      check that the required file is present before accepting to run this job. When a succesful run is present, check if the file date is newer than the succesful run\'s logfile to decide if a re-run is necessary.
+  --RunIfTrue executable [--RunIfTrue executable [...]]
+      Check that given program (no arguments accepted) returns true (0 exit status) to run job, otherwise do not run job (will still be available for later rerun)
+  --badErase
+      If a bad run is present, erase it run lock directory so it can be retried
+  --Onlycheck
+      Do the entire check list but before doing the actual run, exit with a return code value of \"$onlycheck_rc\" (reminder: 1 means that there was an issue, 0 means that the program exited succesfuly, ie in this case a previous run completed, which can still be a bad run)
+
+
+[step2_options] are any options that take effect after the lock is made but before the job is run, and are (in order of use):
+  --goRunInLock
+      Go to the specified directory
+ --CreateDir dir [--CreateDir dir [...]]
+      Create the specified writable directory if it does not exist.
+
+
+[step3_options] are any options that take effect after the job is run (in order of use):
+  --PostRunChangeDir dir
+      Go to the newly created run lock directory
+  --DonePostRun script
+      If the executable or run command exited succesfully, run specified script
+  --ErrorPostRun script
+      If the executable or run command did not exit succesfully, run specified script
+
+
 EOF
 ;
 
