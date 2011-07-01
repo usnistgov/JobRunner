@@ -25,7 +25,7 @@ use strict;
 
 use File::Temp qw(tempfile tempdir);
 use Data::Dumper;
-use Cwd qw(cwd);
+use Cwd qw(cwd abs_path);
 
 my $version     = '0.1b';
 
@@ -769,6 +769,24 @@ sub get_files_list {
 ##########
 
 sub get_pwd { return(cwd()); }
+
+#####
+
+sub get_file_full_path {
+  my ($rp, $from) = &iuav(\@_, '', &get_pwd());
+
+  return($rp) if (&is_blank($rp));
+
+  my $f = $rp;
+  $f = "$from/$rp" if ($rp !~ m%^\/%);
+
+  my $o = abs_path($f);
+
+  $o = $f
+    if (&is_blank($o)); # The request PATH does not exist, fake it
+
+  return($o);
+}
 
 ##########
 
