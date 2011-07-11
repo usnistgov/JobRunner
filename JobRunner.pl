@@ -181,7 +181,7 @@ my $blogfile = "logfile";
 
 foreach my $file (@checkfiles) {
   my $err = JRHelper::check_file_r($file);
-  JRHelper::error_quit("Problem with \'checkfiles\' [$file] : $err")
+  JRHelper::error_quit("Problem with \'checkfile\' [$file] : $err")
       if (! JRHelper::is_blank($err));
 }
 
@@ -228,9 +228,9 @@ if (JRHelper::does_dir_exists($dsDone)) {
   my $flf = (JRHelper::is_blank($rlogfile)) ? "$dsDone/$blogfile" : $rlogfile;
   
   if (JRHelper::does_file_exists($flf)) {
-    JRHelper::ok_quit("${toprint2}Previously succesfully completed, and no files listed in \'checkfiles\' is newer than the logfile, not re-runing")
+    JRHelper::ok_quit("${toprint2}Previously succesfully completed, and no files listed in \'checkfile\' is newer than the logfile, not re-runing")
       if (JRHelper::newest($flf, @checkfiles) eq $flf);
-    vprint("!! ${toprint2}Previously succesfully completed, but at least one file listed in \'checkfiles\' is newer than the logfile => re-runing");
+    vprint("!! ${toprint2}Previously succesfully completed, but at least one file listed in \'checkfile\' is newer than the logfile => re-runing");
   } else {
     vprint("!! ${toprint2}Previously succesfully completed, but logfile absent => considering as new run");
   }
