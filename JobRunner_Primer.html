@@ -323,7 +323,7 @@ like <code>/tmp</code>, such as:
 [ERROR] Problem with 'executable' (./hello_world.bash): file does not exist
 </pre>
 but as we can see the <code>./hello_world.bash</code> script was not
-relative <code>/tmp</code> and therefore is not available to be
+relative to <code>/tmp</code> and therefore is not available to be
 run. To remedy this situation we have to unrelativise <code>.</code>
 by using <code>pwd</code> for the <code>executable</code>
 (<code>lockdir</code> is the only entries that the tool will attempt
@@ -345,9 +345,99 @@ in to the <i>current directory</i>.
 
 <h4>"Hello World !" (version 3)</h4>
 
-In this example, we will run the same 
+In this example, we will run the <code>hello_world.bash</code> program
+but only if the required file <code>required_file</code> is
+present.
+<br>
+First, let us see what happens when the file is not present:
+<pre>
+% rm -f required_file
+% JobRunner --lockdir JR_lockd --name test5 --executable `pwd`/hello_world.bash --dirChange /tmp --checkfile `pwd`/required_file
+[Warning] dirChange -- Current directory changed to '/tmp'
+[ERROR] Problem with 'checkfile' [required_file] : file does not exist
+</pre>
+Now, let's create the file and run the tool:
+<pre>
+% touch required_file
+% JobRunner --lockdir JR_lockd --name test5 --executable `pwd`/hello_world.bash --dirChange /tmp --checkfile `pwd`/required_file
+[Warning] dirChange -- Current directory changed to '/tmp'
+test5 -- Job succesfully completed
+</pre>
+as we can see, because the <code>required_file</code> file does exist,
+the <code>executable</code> can be run.<br>
+<br>
+If we try to rerun the <b>JobRunner</b> tool:
+<pre>
+% JobRunner --lockdir JR_lockd --name test5 --executable `pwd`/hello_world.bash --dirChange /tmp --checkfile `pwd`/required_file
+[Warning] dirChange -- Current directory changed to '/tmp'
+test5 -- Previously succesfully completed, and no files listed in 'checkfile' is newer than the logfile, not re-runing
+</pre>
+, a previous <i>lock directory</i> is present and no
+<code>checkfile</code> files is newer than the logfile, there is no
+need to run or re-run the <i>job</i>.<br>
+<br>
+If we <code>touch</code> the
+<code>required_file</code>, ie change its date as being more recent
+than the last <b>JobRunner</b> run's <code>logfile</code> (and asking
+the tool to be a little more <code>Verbose</code>):
+<pre>
+% touch required_file
+% JobRunner --lockdir JR_lockd --name test5 --executable `pwd`/hello_world.bash --dirChange /tmp --checkfile `pwd`/required_file --Verbose
+[Warning] dirChange -- Current directory changed to '/tmp'
+!! test5 -- Previously succesfully completed, but at least one file listed in 'checkfile' is newer than the logfile => re-runing
+!! Deleting previous run lockdir [<i>pwd_path</i>/JR_lockd/test5_____done]
+%% In progress: test5
 
+++ Creating "In Progress" lock dir
+test5 -- Job succesfully completed
+</pre>
+, here despite the fact that a <i>lock directory</i> was already
+present, the <code>required_file</code> <code>checkfile</code> being
+newer than the <code><i>pwd_path</i>/JR_lockd/test5_____done/logfile</code>,
+<b>JobRunner</b> did a forced <i>re-run</i> of the <i>job</i> by
+deleting the entire <i>lock directory</i>.
+<br>
+This behavior make it possible to have the tool check for updated
+source files before accepting to run (or re-run) a job. It is also
+possible to run a job only if a certain precondition is met. This is
+done using the <code>--RunIfTrue</code> command line option by
+checking the <i>return status code</i> of the executable run, so that
+the user specific condition is met if the return code is <b>0</b> (the
+unix ok exit status). For example, to only run the
+<code>hello_world.bash</code> script when the five minute load is
+under 1.0, we created a small script we named
+<code>is5minloadok.sh</code> that relies on the <code>uptime</code>
+command. The content of that script is as follow:
+<pre>
+#!/bin/bash
+RIL=1.0
+L5E=`uptime | perl -ne 'print $1 if (m%load\saverage.?\:\s+([\d\.]+)%);'| perl -ne 'if ($_ < '$RIL'){print"0"}else{print"1"}'`
+exit $L5E
+</pre>
+in which the <code>RIL</code> variable set the expected load value and
+<code>L5E</code> set the <code>exit</code> by calling
+<code>uptime</code>, extracting the <i>5 minutes load average</i>
+information, comparing it to the <code>RIL</code> value (or
+<i>1.0</i>) so that if the load is less than the value, return
+<code>0</code> (ie the unix <i>ok status</i>) otherwise return
+<code>1</code>.<br>
+After making this <code>is5minloadok.sh</code> program executable, we
+can try to run the <i>test5</i> <i>job</i> again as such:
+<pre>
+% touch required_file
+% JobRunner --lockdir JR_lockd --name test5 --executable `pwd`/hello_world.bash --dirChange /tmp --checkfile `pwd`/required_file --Verbose --RunIfTrue `pwd`/is5minloadok.sh
+[Warning] dirChange -- Current directory changed to '/tmp'
+!! test5 -- Previously succesfully completed, but at least one file listed in 'checkfile' is newer than the logfile => re-runing
+!! Deleting previous run lockdir [[<i>pwd_path</i>/JR_lockd/test5_____done]
+== 'RunIfTrue' check OK ([<i>pwd_path</i>/is5minloadok.sh)
+%% In progress: test5
 
+++ Creating "In Progress" lock dir
+test5 -- Job succesfully completed
+</pre>
+In this case, the load on my system was low enough that the <i>5 minutes
+load</i> was less than 1.0, therefore the <code>RunIfTrue</code>
+returned <i>ok</i> and therefore the job could be run.
 
 
 
