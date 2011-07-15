@@ -107,7 +107,9 @@ my @cc = ();
 &process_options();
 
 if (! JRHelper::is_blank($outconf)) {
-  push @cc, @ARGV;
+  if (scalar @ARGV > 0) {
+    push @cc, '--', @ARGV;
+  }
   JRHelper::error_quit("Problem writing configuration file ($outconf)")
     if (! JRHelper::dump_memory_object($outconf, "", \@cc,
                                     "# Job Runner Configuration file\n\n",
