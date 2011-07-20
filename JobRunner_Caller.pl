@@ -178,7 +178,7 @@ do {
     
     $done{$jrc}++ if ($ok);
     if (($ds) && ($sibj)) {
-      print " (waiting $sleepv seconds)\n";
+      print " (waiting $sibj seconds)\n";
       sleep($sibj);
     }
   }
