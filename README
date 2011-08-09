@@ -1,0 +1,66 @@
+File:  README
+Date:  August 9, 2011
+JobRunner Version: 1.1
+
+
+'JobRunner' is a tool designed to 'run' a 'job', ie to execute a command line or script 
+that does not require user interaction, and take care of storing the program's output 
+(standard error and standard out) in an easy to read log file. The tool is able to save 
+"configuration files" (or "job description") of the job to be run.
+
+'JobRunner_Caller' is a tool designed to 'call' JobRunner's "configuration files", acting as a 
+"queue processor".
+
+The tools were designed to work using directory lock mechanism instead of relying on a central 
+networked server to dispatch jobs and aggregate log and job status information from networked clients.
+
+
+INSTALLATION
+------------
+
+There is no installation mechanism for the tool, as it is a standalone tool and has only one internal 
+depencies to a perl package (JRHelper.pm) containing a set of functions used by both tools.
+Its Perl packages dependencies are only "Getopt::Long".
+
+If you desire to make them available in your PATH, keep the files in their uncompression location 
+(where both executables and the perl package are located), and make symbolic links to the original 
+perl executables, namely:
+
+- with <uncompress_path> the location of both executables and the perl package
+- with <install_path> a location that is part of your PATH
+
+% cd <install_path>
+% ln -s <uncompress_path>/JobRunner.pl JobRunner
+% ln -s <uncompress_path>/JobRunner_Caller.pl JobRunner_Caller
+
+Remember not to remove the uncompressed version of the tools.
+
+
+USAGE
+-----
+
+An informative help page can be obtained by executing the command
+with the option '--help'.
+
+For examples of use, please look at the "JobRunner_Primer.html" file that should have included in this archive.
+
+
+CONTACT
+-------
+
+Please send bug reports to: martial.michel@nist.gov
+
+For the bug report to be useful, please include the command line,
+files and text output, including the error message in your email.
+
+
+AUTHOR
+------
+
+       Martial Michel <martial.michel@nist.gov>
+
+
+COPYRIGHT 
+---------
+
+TBD
