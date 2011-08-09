@@ -19,6 +19,10 @@
 
 use strict;
 
+# attempt to get the .pm files from the location where the script was
+use FindBin qw($RealBin);
+use lib "$RealBin";
+
 # Note: Designed for UNIX style environments (ie use cygwin under Windows).
 
 ##########
