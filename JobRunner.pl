@@ -19,9 +19,13 @@
 
 use strict;
 
-# attempt to get the .pm files from the location where the script was
-use FindBin qw($RealBin);
-use lib "$RealBin";
+my $sd = "";
+BEGIN {
+  use Cwd 'abs_path';
+  use File::Basename 'dirname';
+  $sd = dirname(abs_path($0));
+}
+use lib ($sd);
 
 # Note: Designed for UNIX style environments (ie use cygwin under Windows).
 

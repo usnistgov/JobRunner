@@ -19,9 +19,13 @@
 
 use strict;
 
-# attempt to get the .pm files from the location where the script was
-use FindBin qw($RealBin);
-use lib "$RealBin";
+my $sd = "";
+BEGIN {
+  use Cwd 'abs_path';
+  use File::Basename 'dirname';
+  $sd = dirname(abs_path($0));
+}
+use lib ($sd);
 
 # Note: Designed for UNIX style environments (ie use cygwin under Windows).
 
@@ -91,7 +95,7 @@ JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 my $toolb = "JobRunner";
 my $tool = JRHelper::cmd_which($toolb);
-$tool = "./$toolb.pl" if (! defined $tool);
+$tool = dirname(abs_path($0)) . "/$toolb.pl" if (! defined $tool);
 my @watchdir = ();
 my $sleepv = $dsleepv;
 my $retryall = 0;
