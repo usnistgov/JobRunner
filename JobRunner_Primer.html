@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta content="text/html; charset=ISO-8859-1" http-equiv="Content-Type">
-<title>TRECVID MED11 Scoring Primer</title>
+<title>JobRunner Primer</title>
 <style type="text/css">
   body { counter-reset: chapter; }
   h2:before { content: counter(chapter) ". "; counter-increment: chapter;  /* Add 1 to chapter */ }
@@ -23,13 +23,11 @@ word-wrap: break-word; /* IE 5.5+ */
 </head>
 <body>
 
-
 <div style="text-align: center;"><big><big><big>JobRunner Primer</big></big></big><br>
 </div>
 <div style="text-align: center;"><small>Last modified: June 28th, 2011</small><br>
 </div>
  <br>
-
 
 <h2>Description</h2>
 
@@ -439,11 +437,32 @@ In this case, the load on my system was low enough that the <i>5 minutes
 load</i> was less than 1.0, therefore the <code>RunIfTrue</code>
 returned <i>ok</i> and therefore the job could be run.
 
+<h4>"Hello World !" (version 4)</h4>
+
+
+
+<pre>
+% touch required_file
+% JobRunner --lockdir JR_lockd --name test5 --executable `pwd`/hello_world.bash --dirChange /tmp --checkfile `pwd`/required_file --Verbose --RunIfTrue `pwd`/is5minloadok.sh --DonePostRun 'touch /tmp/test5_doneok' --ErrorPostRun 'touch /tmp/test5_error'
+[Warning] dirChange -- Current directory changed to '/tmp'
+!! test5 -- Previously succesfully completed, but at least one file listed in 'checkfile' is newer than the logfile => re-runing
+!! Deleting previous run lockdir [<i>pwd_path</i>/JR_lockd/test5_____done]
+== 'RunIfTrue' check OK (<i>pwd_path</i>/is5minloadok.sh)
+%% In progress: test5
+
+++ Creating "In Progress" lock dir
+  %% OK Post Running: 'touch /tmp/test5_doneok'
+test5 -- Job succesfully completed
+</pre>
 
 
 <a name="JobRunner_Caller">
 <h2>JobRunner_Caller</h2>
 </a>
+
+
+<!-- check in /slp/SLRE/jobrunner/mx5/mic-interview/ there are a lot -->
+<!-- of examples in there (and in /slp/SLRE2/jobrunner) -->
 
 </body>
 </html>
