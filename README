@@ -1,5 +1,5 @@
 File:  README
-Date:  August 9, 2011
+Date:  February 17, 2012
 JobRunner Version: 1.1
 
 
@@ -18,9 +18,12 @@ networked server to dispatch jobs and aggregate log and job status information f
 INSTALLATION
 ------------
 
+The tool does not need to be installed as it can be called from anywhere and as long as the files
+in the archive are together, it will work.
+
 There is no installation mechanism for the tool, as it is a standalone tool and has only one internal 
 depencies to a perl package (JRHelper.pm) containing a set of functions used by both tools.
-Its Perl packages dependencies are only "Getopt::Long".
+Its Perl packages dependencies are only some core modules.
 
 If you desire to make them available in your PATH, keep the files in their uncompression location 
 (where both executables and the perl package are located), and make symbolic links to the original 
@@ -56,6 +59,7 @@ files and text output, including the error message in your email.
 
 AUTHOR
 ------
+
 
        Martial Michel <martial.michel@nist.gov>
 
