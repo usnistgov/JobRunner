@@ -91,12 +91,13 @@ my $usage = &set_usage();
 JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:                                  h          s  vw     #
+# Used:          J       RS              h        qrs  vw     #
 
 my $toolb = "JobRunner";
 my $tool = JRHelper::cmd_which($toolb);
 $tool = dirname(abs_path($0)) . "/$toolb.pl" if (! defined $tool);
 my @watchdir = ();
+my @dironce = ();
 my $sleepv = $dsleepv;
 my $retryall = 0;
 my $verb = 1;
@@ -116,6 +117,7 @@ GetOptions
    'quiet'      => sub {$verb = 0},
    'RandomOrder:-99' => \$random,
    'SleepInBetweenJobs=i' => \$sibj,
+   'dironce=s'      => \@dironce,
   ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 JRHelper::ok_quit("\n$usage\n") if ($opt{'help'});
 JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
@@ -158,6 +160,18 @@ do {
   foreach my $file (@ARGV) {
     next if (exists $alldone{$file});
     push @tobedone, $file;
+  }
+
+  while (my $dir = shift @dironce) {
+    my $err = JRHelper::check_dir_r($dir);
+    JRHelper::error_quit("Problem with directory ($dir): $err")
+      if (! JRHelper::is_blank($err));
+    my @in = JRHelper::get_files_list($dir);
+    foreach my $file (@in) {
+      my $ff = "$dir/$file";
+      next if (exists $alldone{$ff});
+      push @tobedone, $ff;
+    }
   }
 
   foreach my $dir (@watchdir) {
@@ -307,7 +321,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--JobRunner executable] [--quiet] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--sleep seconds] [--retryall] [--RandomOrder [seed]]] [JobRunner_configfile [JobRunner_configfile [...]]]
+$0 [--help | --version] [--JobRunner executable] [--quiet] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--dironce dir [--dironce dir [...]] [--sleep seconds] [--retryall] [--RandomOrder [seed]]] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
@@ -318,6 +332,7 @@ Where:
   --quiet      Do not print stdout/stderr data from system calls
   --SleepInBetweenJobs  Specify the number of seconds to sleep in between two consecutive jobs (example: when a job check the system load before running using JobRunner\'s \'--RunIfTrue\', this allow the load to drop some) (default is not to sleep)
   --watchdir   Directory to look for configuration files [*]
+  --dironce    Directory to look for configuration files only once
   --sleep      Specify the sleep time in between sets
   --retryall   When running a different set, retry all previously completed entries (especially useful when when a JobRunner configuration uses \'--badErase\' or \'--RunIfTrue\')
   --RandomOrder  Run jobs in random order instead of the order they are provided (can help with multiple lock dir access over NFS if the data is not propagated from server yet) (note: if providing a random seed --which must be over 0-- use different values for multiple JobRunner_Caller, or simply do not provide any and the current \'time\' value will be used)
