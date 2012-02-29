@@ -240,14 +240,16 @@ JRHelper::ok_quit("Done ($donec / $todoc)\n");
 ########################################
 
 sub __cleanmsg {
+  return("") if ($passreport == 0);
+
   # check every JobRunner's 'ok_quit' for string and adapt message
 
-  # level < 2 no need to report, all was well
+  # level > 2
   return(($passreport > 2) ? "Job succesfully completed" : "") if ($_[0] =~ m%Previously\ssuccesfully\scompleted$%);
   return(($passreport > 2) ? "Job succesfully completed" : "") if ($_[0] =~ m%Previously\ssuccesfully\scompleted\,\sand.+$%);
   return(($passreport > 2) ? "Job succesfully completed" : "") if ($_[0] =~ m%Job\ssuccesfully\scompleted$%);
 
-  # level 1
+  # level > 1
   return(($passreport > 1) ? $1 : "") if ($_[0] =~ m%(Job\salready\sin\sprogress\,\sSkipping)$%);
 
   # just in case user need a status on jobs
