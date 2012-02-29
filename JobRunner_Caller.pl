@@ -95,7 +95,8 @@ JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 my $toolb = "JobRunner";
 my $tool = JRHelper::cmd_which($toolb);
-$tool = dirname(abs_path($0)) . "/$toolb.pl" if (! defined $tool);
+$tool = JRHelper::cmd_which(dirname(abs_path($0)) . "/$toolb.pl") if (! defined $tool);
+$tool = JRHelper::cmd_which(dirname(abs_path($0)) . "/$toolb") if (! defined $tool);
 my @watchdir = ();
 my $sleepv = $dsleepv;
 my $retryall = 0;
@@ -121,7 +122,7 @@ GetOptions
    'dironce=s'      => \@dironce,
    'endSetReport' => \$passreport,
   ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
-JRHelper::ok_quit("\n$usage\n") if ($opt{'help'});
+JRHelper::ok_quit("\n$usage\n\nAutoDection of \'$toolb\' found: $tool\n") if ($opt{'help'});
 JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
 
 JRHelper::error_quit("Problem with \'$toolb\' tool ($tool): not found")
@@ -219,8 +220,10 @@ do {
   print "\n\n%%%%%%%%%% Set " . $set++ . " run results: $donec / $todoc %%%%%%%%%%\n";
   if ($passreport) {
     print "%%% Set Report:\n";
-    foreach my $v (sort keys %notdone) {
-      print "[$v]\n     " . $notdone{$v} . "\n";
+    my %tmpr = ();
+    foreach my $v (sort keys %notdone) { push @{$tmpr{$notdone{$v}}}, $v; }
+    foreach my $v (sort keys %tmpr) {
+      print " ** \"$v\" found in:\n     - " . join("\n     - ", @{$tmpr{$v}}) . "\n";
     }
   }
   
@@ -364,7 +367,7 @@ Will execute JobRunner jobs
 Where:
   --help       This help message
   --version    Version information
-  --JobRunner  Location of executable tool (if not in PATH)
+  --JobRunner  Location of executable tool (if not in PATH, will also look for it tool dir)
   --quiet      Do not print stdout/stderr data from system calls
   --endSetReport  At the end of a set, print a report without completed jobs
   --SleepInBetweenJobs  Specify the number of seconds to sleep in between two consecutive jobs (example: when a job check the system load before running using JobRunner\'s \'--RunIfTrue\', this allow the load to drop some) (default is not to sleep)
