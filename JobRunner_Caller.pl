@@ -219,7 +219,7 @@ do {
   $donec = scalar(keys %done);
   print "\n\n%%%%%%%%%% Set " . $set++ . " run results: $donec / $todoc %%%%%%%%%%\n";
   if ($passreport) {
-    print "%%% Set Report:\n";
+    print "%%% Configurations files -- Set Report:\n";
     my %tmpr = ();
     foreach my $v (sort keys %notdone) { push @{$tmpr{$notdone{$v}}}, $v; }
     foreach my $v (sort keys %tmpr) {
