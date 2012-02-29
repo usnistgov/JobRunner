@@ -91,18 +91,19 @@ my $usage = &set_usage();
 JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:          J       RS              h        qrs  vw     #
+# Used:          J       RS           e  h       pqrs  vw     #
 
 my $toolb = "JobRunner";
 my $tool = JRHelper::cmd_which($toolb);
 $tool = dirname(abs_path($0)) . "/$toolb.pl" if (! defined $tool);
 my @watchdir = ();
-my @dironce = ();
 my $sleepv = $dsleepv;
 my $retryall = 0;
 my $verb = 1;
 my $random = undef;
 my $sibj = 0;
+my @dironce = ();
+my $passreport = 0;
 
 my %opt = ();
 GetOptions
@@ -118,6 +119,7 @@ GetOptions
    'RandomOrder:-99' => \$random,
    'SleepInBetweenJobs=i' => \$sibj,
    'dironce=s'      => \@dironce,
+   'endSetReport' => \$passreport,
   ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 JRHelper::ok_quit("\n$usage\n") if ($opt{'help'});
 JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
@@ -149,6 +151,7 @@ my %todo = ();
 my %done = ();
 my $todoc = 0;
 my $donec = 0;
+my %notdone = ();
 
 my %allsetsdone = ();
 my $set = 1;
@@ -195,10 +198,16 @@ do {
 
     $todo{$jrc}++;
 
-    my ($ok, $txt, $ds) = &doit($jrc);
+    my ($ok, $txt, $ds, $msg) = &doit($jrc);
     print "$txt\n" if (! JRHelper::is_blank($txt));
     
-    $done{$jrc}++ if ($ok);
+    if ($ok) {
+      $done{$jrc}++;
+      delete $notdone{$jrc};
+    }
+
+    $notdone{$jrc} = $msg if (! MMisc::is_blank($msg));
+
     if (($ds) && ($sibj)) {
       print " (waiting $sibj seconds)\n";
       sleep($sibj);
@@ -208,17 +217,44 @@ do {
   $todoc = scalar(keys %todo);
   $donec = scalar(keys %done);
   print "\n\n%%%%%%%%%% Set " . $set++ . " run results: $donec / $todoc %%%%%%%%%%\n";
-
+  if ($passreport) {
+    print "%%% Set Report:\n";
+    foreach my $v (sort keys %notdone) {
+      print "[$v]\n     " . $notdone{$v} . "\n";
+    }
+  }
+  
   if ($kdi) {
     print " (waiting $sleepv seconds)\n";
     sleep($sleepv);
   }
+
 
 } while ($kdi);
 
 JRHelper::ok_quit("Done ($donec / $todoc)\n");
 
 ########################################
+
+sub __cleanmsg {
+  # check every JobRunner's 'ok_quit' for string and adapt message
+
+  # no need to report, all was well
+  return("") if ($_[0] =~ m%Previously\ssuccesfully\scompleted$%);
+  return("") if ($_[0] =~ m%Previously\ssuccesfully\scompleted\,\sand.+$%);
+  return("") if ($_[0] =~ m%Job\ssuccesfully\scompleted$%);
+
+  # just in case user need a status on jobs
+  return($1) if ($_[0] =~ m%(Skip\srequested)$%);
+  return($1) if ($_[0] =~ m%(Previous\sbad\srun\spresent\,\sskipping)$%);
+  return($1) if ($_[0] =~ m%(Job\salready\sin\sprogress\,\sSkipping)$%);
+  return($1) if ($_[0] =~ m%(\\\'RunIfTrue\\\'\scheck\sdid\snot\ssucceed.+)$%);
+  
+  #
+  return("UNKNOWN: " . $_[0]);
+}
+
+##
 
 sub doit {
   my ($jrc) = @_;
@@ -234,13 +270,13 @@ sub doit {
   return(0, 
          ($allsetsdone{$jrc} < 2) 
          ? "$header\n  !! Skipping -- Problem with file ($jrc): $err"
-         : "", 0) if (! JRHelper::is_blank($err));
+         : "", 0, "File Issue: $err") if (! JRHelper::is_blank($err));
   
   $err = &check_header($jrc);
   return(0,
          ($allsetsdone{$jrc} < 2)
          ? "$header\n  -- Skipping -- $err"
-         : "", 0) if (! JRHelper::is_blank($err));
+         : "", 0, $err) if (! JRHelper::is_blank($err));
 
   my $jb_cmd = "$tool -u $jrc";
 
@@ -250,10 +286,10 @@ sub doit {
   return(1,
          ($allsetsdone{$jrc} < 2)
          ? ("$header\n  @@ Can be skipped" . ($verb ? "\n(stdout)$so" : ""))
-         : "", 0) if ($rc == 0);
+         : "", 0, &__cleanmsg($so)) if ($rc == 0);
   
   return(1, "$header\n  ?? Possible Problem" . 
-         ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 0) if ($rc == 1);
+         ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 0, "Possible Problem") if ($rc == 1);
 
   ## To be run ? run it !
   # and now really print the header
@@ -261,10 +297,10 @@ sub doit {
 
   my ($rc, $so, $se) = JRHelper::do_system_call($jb_cmd);
   
-  return(1, "  ++ Job completed" . ($verb ? "\n(stdout)$so" : ""), 1)
+  return(1, "  ++ Job completed" . ($verb ? "\n(stdout)$so" : ""), 1, "")
     if ($rc == 0);
   
-  return(0, "  -- ERROR Run" . ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 1);
+  return(0, "  ** ERROR Run" . ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 1, "ERROR RUN");
 }
 
 #####
@@ -321,7 +357,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--JobRunner executable] [--quiet] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--dironce dir [--dironce dir [...]] [--sleep seconds] [--retryall] [--RandomOrder [seed]]] [JobRunner_configfile [JobRunner_configfile [...]]]
+$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--dironce dir [--dironce dir [...]] [--sleep seconds] [--retryall] [--RandomOrder [seed]]] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
@@ -330,6 +366,7 @@ Where:
   --version    Version information
   --JobRunner  Location of executable tool (if not in PATH)
   --quiet      Do not print stdout/stderr data from system calls
+  --endSetReport  At the end of a set, print a report without completed jobs
   --SleepInBetweenJobs  Specify the number of seconds to sleep in between two consecutive jobs (example: when a job check the system load before running using JobRunner\'s \'--RunIfTrue\', this allow the load to drop some) (default is not to sleep)
   --watchdir   Directory to look for configuration files [*]
   --dironce    Directory to look for configuration files only once
