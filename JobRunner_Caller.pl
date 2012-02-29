@@ -120,7 +120,7 @@ GetOptions
    'RandomOrder:-99' => \$random,
    'SleepInBetweenJobs=i' => \$sibj,
    'dironce=s'      => \@dironce,
-   'endSetReport:i' => \$passreport,
+   'endSetReport=i' => \$passreport,
   ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 JRHelper::ok_quit("\n$usage\n\nAutoDection of \'$toolb\' found: $tool\n") if ($opt{'help'});
 JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
@@ -242,15 +242,17 @@ JRHelper::ok_quit("Done ($donec / $todoc)\n");
 sub __cleanmsg {
   # check every JobRunner's 'ok_quit' for string and adapt message
 
-  # no need to report, all was well
-  return("") if ($_[0] =~ m%Previously\ssuccesfully\scompleted$%);
-  return("") if ($_[0] =~ m%Previously\ssuccesfully\scompleted\,\sand.+$%);
-  return("") if ($_[0] =~ m%Job\ssuccesfully\scompleted$%);
+  # level < 2 no need to report, all was well
+  return(($passreport > 2) ? "Job succesfully completed" : "") if ($_[0] =~ m%Previously\ssuccesfully\scompleted$%);
+  return(($passreport > 2) ? "Job succesfully completed" : "") if ($_[0] =~ m%Previously\ssuccesfully\scompleted\,\sand.+$%);
+  return(($passreport > 2) ? "Job succesfully completed" : "") if ($_[0] =~ m%Job\ssuccesfully\scompleted$%);
+
+  # level 1
+  return(($passreport > 1) ? $1 : "") if ($_[0] =~ m%(Job\salready\sin\sprogress\,\sSkipping)$%);
 
   # just in case user need a status on jobs
   return($1) if ($_[0] =~ m%(Skip\srequested)$%);
   return($1) if ($_[0] =~ m%(Previous\sbad\srun\spresent\,\sskipping)$%);
-  return(($passreport > 1) ? $1 : "") if ($_[0] =~ m%(Job\salready\sin\sprogress\,\sSkipping)$%);
   return($1) if ($_[0] =~ m%(\\\'RunIfTrue\\\'\scheck\sdid\snot\ssucceed.+)$%);
   
   #
@@ -360,7 +362,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport [level]] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--dironce dir [--dironce dir [...]] [--sleep seconds] [--retryall] [--RandomOrder [seed]]] [JobRunner_configfile [JobRunner_configfile [...]]]
+$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--dironce dir [--dironce dir [...]] [--sleep seconds] [--retryall] [--RandomOrder [seed]]] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
@@ -369,7 +371,7 @@ Where:
   --version    Version information
   --JobRunner  Location of executable tool (if not in PATH, will also look for it tool dir)
   --quiet      Do not print stdout/stderr data from system calls
-  --endSetReport  At the end of a set, print a report of job status (bypassing succesfully completed jobs) (default \'level\' is to not print \'already in progress\' jobs, use a \'level\' of 2 to add those)
+  --endSetReport  At the end of a set, print a report of job status (bypassing succesfully completed jobs) (\'level\' 1 is to not print \'already in progress\' jobs, use a \'level\' of 2 to add those, and level '3' to add succesfully completed jobs)
   --SleepInBetweenJobs  Specify the number of seconds to sleep in between two consecutive jobs (example: when a job check the system load before running using JobRunner\'s \'--RunIfTrue\', this allow the load to drop some) (default is not to sleep)
   --watchdir   Directory to look for configuration files [*]
   --dironce    Directory to look for configuration files only once
