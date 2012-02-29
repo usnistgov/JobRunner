@@ -206,7 +206,7 @@ do {
       delete $notdone{$jrc};
     }
 
-    $notdone{$jrc} = $msg if (! MMisc::is_blank($msg));
+    $notdone{$jrc} = $msg if (! JRHelper::is_blank($msg));
 
     if (($ds) && ($sibj)) {
       print " (waiting $sibj seconds)\n";
