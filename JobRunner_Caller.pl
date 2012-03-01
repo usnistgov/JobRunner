@@ -91,7 +91,7 @@ my $usage = &set_usage();
 JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:          J       RS           e  h       pqrs  vw     #
+# Used:          J       RS           e  h    m opqrs  vw     #
 
 my $toolb = "JobRunner";
 my $tool = JRHelper::cmd_which($toolb);
@@ -105,6 +105,8 @@ my $random = undef;
 my $sibj = 0;
 my @dironce = ();
 my $passreport = 0;
+my $okquit = 0;
+my $maxSet = -1;
 
 my %opt = ();
 GetOptions
@@ -121,6 +123,8 @@ GetOptions
    'SleepInBetweenJobs=i' => \$sibj,
    'dironce=s'      => \@dironce,
    'endSetReport=i' => \$passreport,
+   'okquit'     => \$okquit,
+   'maxSet=i'   => \$maxSet,
   ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 JRHelper::ok_quit("\n$usage\n\nAutoDection of \'$toolb\' found: $tool\n") if ($opt{'help'});
 JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
@@ -161,9 +165,16 @@ do {
   my @tobedone = ();
   %alldone = () if ($retryall);
 
-  foreach my $file (@ARGV) {
-    next if (exists $alldone{$file});
-    push @tobedone, $file;
+  foreach my $dir (@watchdir) {
+    my $err = JRHelper::check_dir_r($dir);
+    JRHelper::error_quit("Problem with directory ($dir): $err")
+      if (! JRHelper::is_blank($err));
+    my @in = JRHelper::get_files_list($dir);
+    foreach my $file (@in) {
+      my $ff = "$dir/$file";
+      next if (exists $alldone{$ff});
+      push @tobedone, $ff;
+    }
   }
 
   while (my $dir = shift @dironce) {
@@ -178,17 +189,11 @@ do {
     }
   }
 
-  foreach my $dir (@watchdir) {
-    my $err = JRHelper::check_dir_r($dir);
-    JRHelper::error_quit("Problem with directory ($dir): $err")
-      if (! JRHelper::is_blank($err));
-    my @in = JRHelper::get_files_list($dir);
-    foreach my $file (@in) {
-      my $ff = "$dir/$file";
-      next if (exists $alldone{$ff});
-      push @tobedone, $ff;
-    }
+  foreach my $file (@ARGV) {
+    next if (exists $alldone{$file});
+    push @tobedone, $file;
   }
+
 
   if (defined $random) {
     @tobedone = sort _rand @tobedone;
@@ -227,15 +232,20 @@ do {
     }
   }
   
+  $maxSet--;
+  $kdi = 0 if ($maxSet == 0);
+
   if ($kdi) {
     print " (waiting $sleepv seconds)\n";
     sleep($sleepv);
   }
 
-
 } while ($kdi);
 
-JRHelper::ok_quit("Done ($donec / $todoc)\n");
+print "Done ($donec / $todoc)\n";
+
+JRHelper::ok_exit() if (($okquit) || ($donec == $todoc));
+JRHelper::error_exit();
 
 ########################################
 
@@ -364,7 +374,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--dironce dir [--dironce dir [...]] [--sleep seconds] [--retryall] [--RandomOrder [seed]]] [JobRunner_configfile [JobRunner_configfile [...]]]
+$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--dironce dir [--dironce dir [...]] [--RandomOrder [seed]] [--okquit] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
@@ -376,12 +386,18 @@ Where:
   --endSetReport  At the end of a set, print a report of job status (bypassing succesfully completed jobs) (\'level\' 1 is to not print \'already in progress\' jobs, use a \'level\' of 2 to add those, and level '3' to add succesfully completed jobs)
   --SleepInBetweenJobs  Specify the number of seconds to sleep in between two consecutive jobs (example: when a job check the system load before running using JobRunner\'s \'--RunIfTrue\', this allow the load to drop some) (default is not to sleep)
   --watchdir   Directory to look for configuration files [*]
-  --dironce    Directory to look for configuration files only once
+  --maxSet     Specify the maximum number of set to to in \'watchdir\' mode (default is to continue without end)
   --sleep      Specify the sleep time in between sets
   --retryall   When running a different set, retry all previously completed entries (especially useful when when a JobRunner configuration uses \'--badErase\' or \'--RunIfTrue\')
+  --dironce    Directory to look for configuration files only once
   --RandomOrder  Run jobs in random order instead of the order they are provided (can help with multiple lock dir access over NFS if the data is not propagated from server yet) (note: if providing a random seed --which must be over 0-- use different values for multiple JobRunner_Caller, or simply do not provide any and the current \'time\' value will be used)
+  --okquit     The default is to exit with the error status if the \"done\" vs \"todo\" count is not the same, this bypass this behavior and exit with the ok status
 
 *: in this mode, the program will complete a full run then on the files found in this directory, then sleep $dsleepv seconds before re-reading the directory content and see if any new configuration file is present, before running it. The program will never stop, it is left to the user to stop the program.
+
+Job Processing Order: Unless \'--RandomOrder\' is used, jobs are processed in the following order: first the \'--watchdir\' configuration files, then the \'--dironce\' ones, then the command lines ones. Then, if the tool is in \'--watchdir\' mode, it will do a second pass on those files followed by the command line arguments, and the again (until \'--maxSet\' runs)
+
+WARNING: the tool is designed to pass any 'ctrl+C' keyboard input to the \'JobRunner\' tool. To end a \'JobRunner_Caller\' in \'--watchdir\' mode (before any \'--maxSet\' completion if set) it is recommend to use the \'kill\' or \'killall\' commands, or to \'ctrl+z\' and then \'kill\' the \"suspended\" job
 
 
 EOF
