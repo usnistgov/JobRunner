@@ -34,7 +34,7 @@ if ($version =~ m/b$/) {
   $version = "$version (CVS: $cvs_version)";
 }
 
-my $versionid = "MMisc.pm Version: $version";
+my $versionid = "JRHelper.pm Version: $version";
 
 ########## No 'new' ... only functions to be useful
 
@@ -260,6 +260,9 @@ sub load_memory_object {
 
   my $VAR1;
   eval $str;
+  &error_quit("Internal Problem in \'JRHelper::load_memory_object()\' eval-ing code: " . join(" | ", $@))
+    if $@;
+
   return($VAR1);
 }
 
