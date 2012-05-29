@@ -85,6 +85,7 @@ Getopt::Long::Configure(qw(auto_abbrev no_ignore_case));
 ########################################
 # Options processing
 
+my $toprintd = "[JobRunner]";
 my $onlycheck_rc = 99;
 my $usage = &set_usage();
 JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
@@ -94,7 +95,7 @@ JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 my $blockdir = "";
 my @checkfiles = ();
-my $toprint = "";
+my $tname = "";
 my $verb = 0;
 my $redobad = 0;
 my $okquit = 0;
@@ -110,6 +111,8 @@ my $postrun_Done = "";
 my $postrun_Error = "";
 my $postrun_cd = "";
 my $gril = 0;
+my $grid = "";
+my $toprint = "";
 
 my @cc = ();
 &process_options();
@@ -125,54 +128,57 @@ if (! JRHelper::is_blank($outconf)) {
   JRHelper::ok_quit("Wrote \'saveConfig\' file ($outconf)");
 }
 
+my $name = &adapt_name($tname);
+JRHelper::error_quit("No \'name\' specified, aborting")
+  if (JRHelper::is_blank($name));
+
+my $toprint2 = (JRHelper::is_blank($toprint)) ? "$toprintd $name : " : "$toprint "; 
+## From here we ought to use the local error_quit
+
 foreach my $ddir (@predir) {
-  JRHelper::error_quit("Could not create requested \'preCreateDir\' dir ($ddir)")
+  JRHelper::error_quit("${toprint2}Could not create requested \'preCreateDir\' dir ($ddir)")
     if (! JRHelper::make_wdir($ddir));
 }
 
 my $pwd = JRHelper::get_pwd();
 if (! JRHelper::is_blank($dirchange)) {
   my $err = JRHelper::check_dir_r($dirchange);
-  JRHelper::error_quit("Problem with \'dirChange\' directory ($dirchange): $err")
+  JRHelper::error_quit("${toprint2}Problem with \'dirChange\' directory ($dirchange): $err")
     if (! JRHelper::is_blank($err));
-  chdir($dirchange);
-  JRHelper::warn_print("dirChange -- Current directory changed to \'$dirchange\'");
+  JRHelper::error_quit("${toprint2}Could not change to requested \'dirChange\' directory ($dirchange)")
+    if (! chdir($dirchange));
+  JRHelper::warn_print("${toprint2}dirChange -- Current directory changed to \'$dirchange\'");
 }
 
 # Remaining of command line is the command to start
-JRHelper::error_quit("\'executable\' and command line can not be used at the same time")
+JRHelper::error_quit("${toprint2}\'executable\' and command line can not be used at the same time")
   if ((defined $executable) && (scalar @ARGV > 0));
-JRHelper::error_quit("Neither \'executable\', nor command line are specified, and we are not in \'OnlyCheck\' mode")
+JRHelper::error_quit("${toprint2}Neither \'executable\', nor command line are specified, and we are not in \'OnlyCheck\' mode")
   if ((! defined $executable) && (scalar @ARGV == 0) && (! $onlycheck));
 
 if (defined $executable) {
   my $err = JRHelper::check_file_x($executable);
-  JRHelper::error_quit("Problem with \'executable\' ($executable): $err")
+  JRHelper::error_quit("${toprint2}Problem with \'executable\' ($executable): $err")
     if (! JRHelper::is_blank($err));
 }
 
 foreach my $rit (@runiftrue) {
   my $err = JRHelper::check_file_x($rit);
-  JRHelper::error_quit("Problem with \'RunIfTrue\' executable ($rit): $err")
+  JRHelper::error_quit("${toprint2}Problem with \'RunIfTrue\' executable ($rit): $err")
     if (! JRHelper::is_blank($err));
 }
 
 $blockdir =~ s%\/$%%; # remove trailing /
 $blockdir = JRHelper::get_file_full_path($blockdir, $pwd);
-JRHelper::error_quit("No \'lockdir\' specified, aborting")
+JRHelper::error_quit("${toprint2}No \'lockdir\' specified, aborting")
   if (JRHelper::is_blank($blockdir));
-#die "[$blockdir]\n";
-
-my $name = &adapt_name($toprint);
-JRHelper::error_quit("No \'name\' specified, aborting")
-  if (JRHelper::is_blank($name));
 
 my $err = JRHelper::check_dir_w($blockdir);
-JRHelper::error_quit("Problem with \'lockdir\' : $err")
+JRHelper::error_quit("${toprint2}Problem with \'lockdir\' : $err")
   if (! JRHelper::is_blank($err));
 
 my $lockdir = "$blockdir/$name";
-JRHelper::error_quit("The lockdir directory ($lockdir) must not exist to use this tool")
+JRHelper::error_quit("${toprint2}The lockdir directory ($lockdir) must not exist to use this tool")
   if (JRHelper::does_dir_exists($lockdir));
 
 my @dir_end = ("done", "skip", "bad", "inprogress");
@@ -180,22 +186,19 @@ my $ds_sep  = "_____";
 my @all = ();
 foreach my $end (@dir_end) {
   my $tmp = "${ds_sep}$end";
-  JRHelper::error_quit("Requested lockdir can not end in \'$tmp\' ($lockdir)")
+  JRHelper::error_quit("${toprint2}Requested lockdir can not end in \'$tmp\' ($lockdir)")
       if ($lockdir =~ m%$tmp$%i);
   push @all, "$lockdir$tmp";
 }
 my ($dsDone, $dsSkip, $dsBad, $dsRun) = @all;
-#print "[+] ", join("\n[+] ", @all), "\n";
 
 my $blogfile = "logfile";
 
 foreach my $file (@checkfiles) {
   my $err = JRHelper::check_file_r($file);
-  JRHelper::error_quit("Problem with \'checkfile\' [$file] : $err")
+  JRHelper::error_quit("${toprint2}Problem with \'checkfile\' [$file] : $err")
       if (! JRHelper::is_blank($err));
 }
-
-my $toprint2 = (! JRHelper::is_blank($toprint)) ? "$toprint -- " : ""; 
 
 my @mulcheck = ();
 foreach my $tmpld (@all) {
@@ -213,20 +216,18 @@ JRHelper::ok_quit("${toprint2}Skip requested")
   if (JRHelper::does_dir_exists($dsSkip));
 
 
-
 ##########
 ## Previously bad ?
 if (JRHelper::does_dir_exists($dsBad)) {
   JRHelper::ok_quit("${toprint2}Previous bad run present, skipping")
       if (! $redobad);
 
-  vprint("!! Deleting previous run lockdir [$dsBad]");
+  &vprint("${toprint2}!! Deleting previous run lockdir [$dsBad]");
   
   `rm -rf $dsBad`;
   JRHelper::error_quit("${toprint2}Problem deleting \'bad\' lockdir [$dsBad], still present ?")
       if (JRHelper::does_dir_exists($dsBad));
 }
-
 
 
 ##########
@@ -240,17 +241,16 @@ if (JRHelper::does_dir_exists($dsDone)) {
   if (JRHelper::does_file_exists($flf)) {
     JRHelper::ok_quit("${toprint2}Previously succesfully completed, and no files listed in \'checkfile\' is newer than the logfile, not re-runing")
       if (JRHelper::newest($flf, @checkfiles) eq $flf);
-    vprint("!! ${toprint2}Previously succesfully completed, but at least one file listed in \'checkfile\' is newer than the logfile => re-runing");
+    &vprint("!! ${toprint2}Previously succesfully completed, but at least one file listed in \'checkfile\' is newer than the logfile => re-runing");
   } else {
-    vprint("!! ${toprint2}Previously succesfully completed, but logfile absent => considering as new run");
+    &vprint("!! ${toprint2}Previously succesfully completed, but logfile absent => considering as new run");
   }
   
-  vprint("!! Deleting previous run lockdir [$dsDone]");
+  &vprint("${toprint2}!! Deleting previous run lockdir [$dsDone]");
   `rm -rf $dsDone`;
   JRHelper::error_quit("${toprint2}Problem deleting lockdir [$dsDone], still present ?")
     if (JRHelper::does_dir_exists($dsDone));
 }
-
 
 
 ##########
@@ -263,49 +263,67 @@ JRHelper::ok_quit("${toprint2}Job already in progress, Skipping")
 &check_RunIfTrue();
 
 if ($onlycheck) {
-  vprint("${toprint2}Would actually have to run tool, exiting with expected return code ($onlycheck_rc)\n");
+  &vprint("${toprint2}Would actually have to run tool, exiting with expected return code ($onlycheck_rc)\n");
   exit($onlycheck_rc);
 }
 
-vprint("%% In progress: $toprint\n");
+&vprint("${toprint2}%% In progress: $toprint\n");
 
 # In case the user use Ctrl+C do not return "ok"
-sub SIGINTh { JRHelper::error_quit("\'Ctrl+C\'-ed, exiting with error status"); }
+sub SIGINTh { JRHelper::error_quit("${toprint2}\'Ctrl+C\'-ed, exiting with error status"); }
 $SIG{'INT'} = 'SIGINTh';
 
-vprint("++ Creating \"In Progress\" lock dir");
-#JRHelper::error_quit("[$dsRun]");
+&vprint("${toprint2}++ Creating \"In Progress\" lock dir");
 JRHelper::error_quit("${toprint2}Could not create writable dir ($dsRun)")
   if (! JRHelper::make_wdir($dsRun));
 my $flf = (JRHelper::is_blank($rlogfile)) ? "$dsRun/$blogfile" : $rlogfile;
 
+## From here any "error_quit" has to rename $dsRun to $dsBad
+
 # goRunInLock
 if ($gril) {
-  chdir($dsRun);
-  JRHelper::warn_print("goRunInLock -- Current directory changed to \'$dsRun\'");
+  if (! chdir($dsRun)) {
+    &rod($dsRun, $dsBad); # Move to "bad" status
+    JRHelper::error_quit("${toprint2}Could not change to requested \'goRunInLock\' directory ($dsRun)");
+  }
+  JRHelper::warn_print("${toprint2}goRunInLock -- Current directory changed to \'$dsRun\'");
 }
 
 # CreateDir
 foreach my $ddir (@destdir) {
-  JRHelper::error_quit("${toprint2}Could not create requested \'CreateDir\' dir ($ddir)")
-    if (! JRHelper::make_wdir($ddir));
+  if (! JRHelper::make_wdir($ddir)) {
+    &rod($dsRun, $dsBad); # Move to "bad" status
+    JRHelper::error_quit("${toprint2}Could not create requested \'CreateDir\' dir ($ddir)");
+  }
+}
+
+# GoRunInDir
+if (! MMisc::is_blank($grid)) {
+  if (! chdir($grid)) {
+    &rod($dsRun, $dsBad); # Move to "bad" status
+    JRHelper::error_quit("${toprint2}Could not change to requested \'GoRunInDir\' directory ($grid)");
+  }
+  JRHelper::warn_print("${toprint2}GoRunInDir -- Current directory changed to \'$grid\'");
 }
 
 my ($rv, $tx, $so, $se, $retcode, $flogfile)
   = JRHelper::write_syscall_logfile
   ($flf, (defined $executable) ? $executable : @ARGV);
-vprint("-- Final Logfile different from expected one: $flogfile")
+&vprint("${toprint2}-- Final Logfile different from expected one: $flogfile")
   if ($flogfile ne $flf);
 
 if (! JRHelper::is_blank($postrun_cd)) {
-  chdir($postrun_cd);
-  JRHelper::warn_print("PostRunChangeDir -- Current directory changed to \'$postrun_cd\'");
+  if (! chdir($postrun_cd)) {
+    &rod($dsRun, $dsBad); # Move to "bad" status
+    JRHelper::error_quit("${toprint2}Could not change to requested \'PostRunChangeDir\' directory ($postrun_cd)");
+  }
+  JRHelper::warn_print("${toprint2}PostRunChangeDir -- Current directory changed to \'$postrun_cd\'");
 }
 
 if ($retcode == 0) {
   &rod($dsRun, $dsDone); # Move to "ok" status
   if (! JRHelper::is_blank($postrun_Done)) {
-    print "  %% OK Post Running: \'$postrun_Done\'\n";
+    &vprint("${toprint2}%% OK Post Running: \'$postrun_Done\'\n");
     my ($rc, $so, $se) = JRHelper::do_system_call($postrun_Done);
     &_postrunning_status("\'OK Post Running\'", $rc, $so, $se);
   }
@@ -315,21 +333,21 @@ if ($retcode == 0) {
 ## If we are here, it means it was a BAD run
 &rod($dsRun, $dsBad); # Move to "bad" status
 if (! JRHelper::is_blank($postrun_Error)) {
-  print "  %% ERROR Post Running: \'$postrun_Error\'\n";
+  &vprint("${toprint2}%% ERROR Post Running: \'$postrun_Error\'\n");
   my ($rc, $so, $se) = JRHelper::do_system_call($postrun_Error);
   &_postrunning_status("\'ERROR Post Running\'", $rc, $so, $se);
 }
 $flogfile =~ s%$dsRun%$dsBad%;
-&error_quit($retcode, "${toprint2}Error during run, see logfile ($flogfile)");
+&ec_error_quit($retcode, "${toprint2}Error during run, see logfile ($flogfile)");
 
 ########################################
 
 sub _postrunning_status {
   my ($mode, $rc, $so, $se) = @_;
-  print "  %% Warning: Unsuccesfull return code for $mode\n"
+  JRHelper::warn_print("${toprint2}Unsuccesfull return code for $mode\n")
     if ($rc != 0);
-  print "  %% stdout: $so\n" if (! JRHelper::is_blank($so));
-  print "  %% stderr: $se\n" if (! JRHelper::is_blank($se));
+  &vprint("${toprint2}$mode -- stdout: $so\n") if (! JRHelper::is_blank($so));
+  &vprint("${toprint2}$mode -- stderr: $se\n") if (! JRHelper::is_blank($se));
 }
 
 #####
@@ -360,7 +378,7 @@ sub vprint {
 
 #####
 
-sub error_quit {
+sub ec_error_quit {
   my $ec = shift @_;
   print('[ERROR] ', join(' ', @_), "\n");
   exit(0) if ($okquit);
@@ -375,10 +393,10 @@ sub check_RunIfTrue {
   foreach my $rit (@runiftrue) {
     my ($rc, $so, $se) = JRHelper::do_system_call($rit);
     if ($rc == 0) {
-      vprint("== \'RunIfTrue\' check OK ($rit)");
+      &vprint("${toprint2}== \'RunIfTrue\' check OK ($rit)");
     } else {
-      vprint("== \'RunIfTrue\' check FAILED ($rit)\n stdout:$so\n stderr:$se");
-      JRHelper::ok_quit("${toprint2} \'RunIfTrue\' check did not succeed ($rit), will not run job, but exiting with success return code");
+      &vprint("${toprint2}== \'RunIfTrue\' check FAILED ($rit)\n stdout:$so\n stderr:$se");
+      JRHelper::ok_quit("${toprint2}\'RunIfTrue\' check did not succeed ($rit), will not run job, but exiting with success return code");
     }
   }
 }
@@ -392,7 +410,7 @@ sub _cc2 { push @cc, "--" . $_[0]; push @cc, $_[1]; }
 
 sub process_options {
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:   CDE      L  OP R   V     bcde gh   l nop rs uv      #
+# Used:   CDE G    L  OP R   V     bcde gh   l nop rstuv      #
 
   my %opt = ();
 
@@ -403,7 +421,7 @@ sub process_options {
      'version',
      'lockdir=s'   => sub {$blockdir = $_[1]; &_cc2(@_);},
      'checkfile=s' => sub {push @checkfiles, $_[1]; &_cc2(@_);},
-     'name=s'      => sub {$toprint = $_[1]; &_cc2(@_)},
+     'name=s'      => sub {$tname = $_[1]; &_cc2(@_)},
      'Verbose'     => sub {$verb++; &_cc1(@_);},
      'badErase'    => sub {$redobad++; &_cc1(@_);},
      'okquit'      => sub {$okquit++; &_cc1(@_);},
@@ -420,6 +438,8 @@ sub process_options {
      'ErrorPostRun=s' => sub {$postrun_Error = $_[1]; &_cc2(@_);},
      'PostRunChangeDir=s' => sub {$postrun_cd = $_[1]; &_cc2(@_);},
      'goRunInLock'    => sub {$gril = 1; &_cc1(@_);},
+     'GoRunInDir=s'   => sub {$grid = $_[1]; &_cc2(@_);},
+     'toPrint=s'      => sub {$toprint = $_[1]; &_cc2(@_);},
     ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
   JRHelper::ok_quit("\n$usage\n") if ($opt{'help'});
   JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
@@ -481,7 +501,8 @@ required_options are:
       Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using \'--useConfig\'
   --useConfig file
       Use one (and only one) JobRunner configuration files generated by \'--saveConfig\'. To run on multiple files, use \'JobRunner_Caller\'.
-
+  --toPrint text
+    Change the default output header for JobRunner from: $toprint followed by jobid to user given entry
 
 [step1_options] are any options that take effect before the lock is made, and are (in order of use):
   --preCreateDir dir [--preCreateDir dir [...]] 
@@ -502,14 +523,16 @@ required_options are:
 
 [step2_options] are any options that take effect after the lock is made but before the job is run, and are (in order of use):
   --goRunInLock
-      Go to the specified directory
- --CreateDir dir [--CreateDir dir [...]]
+      Run in the lock directory
+  --CreateDir dir [--CreateDir dir [...]]
       Create the specified writable directory if it does not exist.
+  --GoRunInDir
+      Run in the specified directory
 
 
 [step3_options] are any options that take effect after the job is run (in order of use):
   --PostRunChangeDir dir
-      Go to the newly created run lock directory
+      Change directory to dir
   --DonePostRun script
       If the executable or run command exited succesfully, run specified script
   --ErrorPostRun script
