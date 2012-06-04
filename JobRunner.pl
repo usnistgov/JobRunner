@@ -113,6 +113,7 @@ my $postrun_cd = "";
 my $gril = 0;
 my $grid = "";
 my $toprint = "";
+my $successreturn = undef;
 
 my @cc = ();
 &process_options();
@@ -134,6 +135,9 @@ JRHelper::error_quit("No \'name\' specified, aborting")
 
 my $toprint2 = (JRHelper::is_blank($toprint)) ? "$toprintd $name : " : "$toprint "; 
 ## From here we ought to use the local error_quit
+
+JRHelper::error_quit("\'0\' or \'1\' are reserved \"SuccessReturnCode\" values")
+  if ((defined $successreturn) && (($successreturn == 0) || ($successreturn == 1)));
 
 foreach my $ddir (@predir) {
   JRHelper::error_quit("${toprint2}Could not create requested \'preCreateDir\' dir ($ddir)")
@@ -233,17 +237,17 @@ if (JRHelper::does_dir_exists($dsBad)) {
 ##########
 ## Previously done ?
 if (JRHelper::does_dir_exists($dsDone)) {
-  JRHelper::ok_quit("${toprint2}Previously succesfully completed")
+  JRHelper::ok_quit("${toprint2}Previously successfully completed")
     if (scalar @checkfiles == 0);
   
   my $flf = (JRHelper::is_blank($rlogfile)) ? "$dsDone/$blogfile" : $rlogfile;
   
   if (JRHelper::does_file_exists($flf)) {
-    JRHelper::ok_quit("${toprint2}Previously succesfully completed, and no files listed in \'checkfile\' is newer than the logfile, not re-runing")
+    JRHelper::ok_quit("${toprint2}Previously successfully completed, and no files listed in \'checkfile\' is newer than the logfile, not re-runing")
       if (JRHelper::newest($flf, @checkfiles) eq $flf);
-    &vprint("!! ${toprint2}Previously succesfully completed, but at least one file listed in \'checkfile\' is newer than the logfile => re-runing");
+    &vprint("!! ${toprint2}Previously successfully completed, but at least one file listed in \'checkfile\' is newer than the logfile => re-runing");
   } else {
-    &vprint("!! ${toprint2}Previously succesfully completed, but logfile absent => considering as new run");
+    &vprint("!! ${toprint2}Previously successfully completed, but logfile absent => considering as new run");
   }
   
   &vprint("${toprint2}!! Deleting previous run lockdir [$dsDone]");
@@ -327,7 +331,9 @@ if ($retcode == 0) {
     my ($rc, $so, $se) = JRHelper::do_system_call($postrun_Done);
     &_postrunning_status("\'OK Post Running\'", $rc, $so, $se);
   }
-  JRHelper::ok_quit("${toprint2}Job succesfully completed");
+  print("${toprint2}Job successfully completed\n");
+  exit($successreturn) if (defined $successreturn);
+  JRHelper::ok_exit();
 }
 
 ## If we are here, it means it was a BAD run
@@ -344,7 +350,7 @@ $flogfile =~ s%$dsRun%$dsBad%;
 
 sub _postrunning_status {
   my ($mode, $rc, $so, $se) = @_;
-  JRHelper::warn_print("${toprint2}Unsuccesfull return code for $mode\n")
+  JRHelper::warn_print("${toprint2}Unsuccessfull return code for $mode\n")
     if ($rc != 0);
   &vprint("${toprint2}$mode -- stdout: $so\n") if (! JRHelper::is_blank($so));
   &vprint("${toprint2}$mode -- stderr: $se\n") if (! JRHelper::is_blank($se));
@@ -381,7 +387,7 @@ sub vprint {
 sub ec_error_quit {
   my $ec = shift @_;
   print('[ERROR] ', join(' ', @_), "\n");
-  exit(0) if ($okquit);
+  JRHelper::ok_exit() if ($okquit);
   exit($ec);
 }
 
@@ -410,7 +416,7 @@ sub _cc2 { push @cc, "--" . $_[0]; push @cc, $_[1]; }
 
 sub process_options {
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:   CDE G    L  OP R   V     bcde gh   l nop rstuv      #
+# Used:   CDE G    L  OP RS  V     bcde gh   l nop rstuv      #
 
   my %opt = ();
 
@@ -440,6 +446,7 @@ sub process_options {
      'goRunInLock'    => sub {$gril = 1; &_cc1(@_);},
      'GoRunInDir=s'   => sub {$grid = $_[1]; &_cc2(@_);},
      'toPrint=s'      => sub {$toprint = $_[1]; &_cc2(@_);},
+     'SuccessReturnCode=i' => sub {$successreturn = $_[1]; &_cc2(@_);},
     ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
   JRHelper::ok_quit("\n$usage\n") if ($opt{'help'});
   JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
@@ -497,6 +504,8 @@ required_options are:
       Print more verbose status updates
   --okquit
       In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
+  --SuccessReturnCode
+      If the command line to run was ran successfully, return the user provided error code, any other return code indicate a non successful completion (including skipping job)
   --saveConfig file
       Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using \'--useConfig\'
   --useConfig file
@@ -512,13 +521,13 @@ required_options are:
   --LogFile file
       Override the default location of the log file (inside the run lock directory). Use this option with caution since it will influence the behavior of \'checkfile\'
   --checkfile file [--checkfile file [...]]
-      check that the required file is present before accepting to run this job. When a succesful run is present, check if the file date is newer than the succesful run\'s logfile to decide if a re-run is necessary.
+      check that the required file is present before accepting to run this job. When a successful run is present, check if the file date is newer than the successful run\'s logfile to decide if a re-run is necessary.
   --RunIfTrue executable [--RunIfTrue executable [...]]
       Check that given program (no arguments accepted) returns true (0 exit status) to run job, otherwise do not run job (will still be available for later rerun)
   --badErase
       If a bad run is present, erase it run lock directory so it can be retried
   --Onlycheck
-      Do the entire check list but before doing the actual run, exit with a return code value of \"$onlycheck_rc\" (reminder: 1 means that there was an issue, 0 means that the program exited succesfuly, ie in this case a previous run completed, which can still be a bad run)
+      Do the entire check list but before doing the actual run, exit with a return code value of \"$onlycheck_rc\" (reminder: 1 means that there was an issue, 0 means that the program exited successfully, ie in this case a previous run completed, which can still be a bad run)
 
 
 [step2_options] are any options that take effect after the lock is made but before the job is run, and are (in order of use):
@@ -534,9 +543,9 @@ required_options are:
   --PostRunChangeDir dir
       Change directory to dir
   --DonePostRun script
-      If the executable or run command exited succesfully, run specified script
+      If the executable or run command exited successfully, run specified script
   --ErrorPostRun script
-      If the executable or run command did not exit succesfully, run specified script
+      If the executable or run command did not exit successfully, run specified script
 
 
 EOF
