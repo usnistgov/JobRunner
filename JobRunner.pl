@@ -298,7 +298,7 @@ foreach my $ddir (@destdir) {
 }
 
 # GoRunInDir
-if (! MMisc::is_blank($grid)) {
+if (! JRHelper::is_blank($grid)) {
   if (! chdir($grid)) {
     &rod($dsRun, $dsBad); # Move to "bad" status
     JRHelper::error_quit("${toprint2}Could not change to requested \'GoRunInDir\' directory ($grid)");
