@@ -416,7 +416,7 @@ sub _cc2 { push @cc, "--" . $_[0]; push @cc, $_[1]; }
 
 sub process_options {
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:   CDE G    L  OP RS  V     bcde gh   l nop rstuv      #
+# Used:   CDE G    L  OP RS  V     bcde gh   l nop  stuv      #
 
   my %opt = ();
 
@@ -525,7 +525,7 @@ required_options are:
   --RunIfTrue executable [--RunIfTrue executable [...]]
       Check that given program (no arguments accepted) returns true (0 exit status) to run job, otherwise do not run job (will still be available for later rerun)
   --badErase
-      If a bad run is present, erase it run lock directory so it can be retried
+      If a bad run is present, erase its run lock directory so it can be retried
   --Onlycheck
       Do the entire check list but before doing the actual run, exit with a return code value of \"$onlycheck_rc\" (reminder: 1 means that there was an issue, 0 means that the program exited successfully, ie in this case a previous run completed, which can still be a bad run)
 
