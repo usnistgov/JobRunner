@@ -471,6 +471,15 @@ sub ok_quit {
   &ok_exit();
 }
 
+#####
+
+sub sp_quit {
+  my $rc = shift @_;
+  print(join(' ', @_), "\n");
+  exit($rc) if (defined $rc);
+  ok_exit();
+}
+
 ####################
 
 sub _check_file_dir_core {
