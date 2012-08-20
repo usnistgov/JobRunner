@@ -505,7 +505,7 @@ required_options are:
   --okquit
       In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
   --SuccessReturnCode
-      If the command line to run was ran successfully (or previously run succesfully), return the user provided error code, any other return code indicate a non successful completion (including skipping job)
+      If the command line to run was ran successfully (or previously run successfully), return the user provided error code, any other return code indicate a non successful completion (including skipping job)
   --saveConfig file
       Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using \'--useConfig\'
   --useConfig file

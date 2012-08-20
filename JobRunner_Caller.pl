@@ -271,9 +271,9 @@ sub __cleanmsg {
   # check every JobRunner's 'ok_quit' for string and adapt message
 
   # level > 2
-  return(($passreport > 2) ? "Job succesfully completed" : "") if ($_[0] =~ m%Previously\ssuccesfully\scompleted$%);
-  return(($passreport > 2) ? "Job succesfully completed" : "") if ($_[0] =~ m%Previously\ssuccesfully\scompleted\,\sand.+$%);
-  return(($passreport > 2) ? "Job succesfully completed" : "") if ($_[0] =~ m%Job\ssuccesfully\scompleted$%);
+  return(($passreport > 2) ? "Job successfully completed" : "") if ($_[0] =~ m%Previously\ssuccessfully\scompleted$%);
+  return(($passreport > 2) ? "Job successfully completed" : "") if ($_[0] =~ m%Previously\ssuccessfully\scompleted\,\sand.+$%);
+  return(($passreport > 2) ? "Job successfully completed" : "") if ($_[0] =~ m%Job\ssuccessfully\scompleted$%);
 
   # level > 1
   return(($passreport > 1) ? $1 : "") if ($_[0] =~ m%(Job\salready\sin\sprogress\,\sSkipping)$%);
@@ -399,22 +399,22 @@ Where:
   --version    Version information
   --JobRunner  Location of executable tool (if not in PATH, will also look for it tool dir)
   --quiet      Do not print stdout/stderr data from system calls
-  --endSetReport  At the end of a set, print a report of job status (bypassing succesfully completed jobs) (\'level\' 1 is to not print \'already in progress\' jobs, use a \'level\' of 2 to add those, and level '3' to add succesfully completed jobs)
+  --endSetReport  At the end of a set, print a report of job status (bypassing successfully completed jobs) (\'level\' 1 is to not print \'already in progress\' jobs, use a \'level\' of 2 to add those, and level '3' to add successfully completed jobs)
   --SleepInBetweenJobs  Specify the number of seconds to sleep in between two consecutive jobs (example: when a job check the system load before running using JobRunner\'s \'--RunIfTrue\', this allow the load to drop some) (default is not to sleep)
   --watchdir   Directory to look for configuration files [*]
   --maxSet     Specify the maximum number of set to to in \'watchdir\' mode (default is to continue without end)
-  --sleep      Specify the sleep time in between sets
+  --sleep      Specify the sleep time in between sets (default: $dsleepv)
   --retryall   When running a different set, retry all previously completed entries (especially useful when when a JobRunner configuration uses \'--badErase\' or \'--RunIfTrue\')
   --dironce    Directory to look for configuration files only once
   --timeSort   Run jobs in configuration files\' Access Time, Creation Time, Modification Time order, instead of the order they are provided. Valid values: $ts_okv_txt
   --RandomOrder  Run jobs in random order instead of the order they are provided (can help with multiple lock dir access over NFS if the data is not propagated from server yet) (note: if providing a random seed --which must be over 0-- use different values for multiple JobRunner_Caller, or simply do not provide any and the current \'time\' value will be used)
   --okquit     The default is to exit with the error status if the \"done\" vs \"todo\" count is not the same, this bypass this behavior and exit with the ok status
 
-*: in this mode, the program will complete a full run then on the files found in this directory, then sleep $dsleepv seconds before re-reading the directory content and see if any new configuration file is present, before running it. The program will never stop, it is left to the user to stop the program.
+*: in this mode, the program will complete a full run then on the files found in this directory, then sleep \'--sleep\' seconds before re-reading the directory content and see if any new configuration file is present, before running it. The program will never stop, it is left to the user to stop the program.
 
 Job Processing Order: Unless \'--RandomOrder\' or \'--ctimeSort\' are used, jobs are processed in the following order: first the \'--watchdir\' configuration files, then the \'--dironce\' ones, then the command lines ones. Then, if the tool is in \'--watchdir\' mode, it will do a second pass on those files followed by the command line arguments, and the again (until \'--maxSet\' runs)
 
-WARNING: the tool is designed to pass any 'ctrl+C' keyboard input to the \'JobRunner\' tool. To end a \'JobRunner_Caller\' in \'--watchdir\' mode (before any \'--maxSet\' completion if set) it is recommend to use the \'kill\' or \'killall\' commands, or to \'ctrl+z\' and then \'kill\' the \"suspended\" job
+WARNING: the tool is designed to pass any 'ctrl+C' keyboard input to the \'JobRunner\' tool. To end a \'JobRunner_Caller\' in \'--watchdir\' mode (before any \'--maxSet\' completion if set) it is recommend to use the \'kill\' or \'killall\' commands, or to \'ctrl+z\' and then \'kill\' the \"suspended\" job (or to kill it during its \"sleep\" times)
 
 
 EOF
