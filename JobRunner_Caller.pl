@@ -86,12 +86,14 @@ Getopt::Long::Configure(qw(auto_abbrev no_ignore_case));
 # Options processing
 
 my $dsleepv = 60;
+my @ts_okv = ('atime', 'ctime', 'mtime');
+my $ts_okv_txt = join(" ", @ts_okv);
 
 my $usage = &set_usage();
 JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:          J       RS         c e  h    m opqrs  vw     #
+# Used:          J       RS           e  h    m opqrst vw     #
 
 my $toolb = "JobRunner";
 my $tool = JRHelper::cmd_which($toolb);
@@ -107,7 +109,7 @@ my @dironce = ();
 my $passreport = 0;
 my $okquit = 0;
 my $maxSet = -1;
-my $ctimesort = 0;
+my $timesort = "";
 
 my %opt = ();
 GetOptions
@@ -126,7 +128,7 @@ GetOptions
    'endSetReport=i' => \$passreport,
    'okquit'     => \$okquit,
    'maxSet=i'   => \$maxSet,
-   'ctimeSort'  => \$ctimesort,
+   'timeSort=s' => \$timesort,
   ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 JRHelper::ok_quit("\n$usage\n\nAutoDection of \'$toolb\' found: $tool\n") if ($opt{'help'});
 JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
@@ -140,9 +142,12 @@ JRHelper::error_quit("Problem with \'$toolb\' tool ($tool): $err")
 JRHelper::error_quit("\SleepInBetweenJobs\' values must be positive ($sibj)")
   if ($sibj < 0);
 
-JRHelper::error_quit("\Random\' and \'ctimeSort\' can not be used at the same time")
-  if ((defined $random) && ($ctimesort != 0));
-
+JRHelper::error_quit("\Random\' and \'timeSort\' can not be used at the same time")
+  if ((defined $random) && (! JRHelper::is_blank($timesort)));
+      
+JRHelper::error_quit("Unknow \'timeSort\' value ($timesort), valid options are: $ts_okv_txt")
+  if ((! JRHelper::is_blank($timesort)) && (! grep(m%^$timesort$%, @ts_okv)));
+      
 my $randi = 0;
 my $rands = 0;
 my @randa = ();
@@ -203,11 +208,11 @@ do {
   if (defined $random) {
     @tobedone = sort _rand @tobedone;
   }
-  if ($ctimesort) {
-    ($err, @tobedone) = JRHelper::sort_files('ctime', @tobedone);
+  if (! JRHelper::is_blank($timesort)) {
+    ($err, @tobedone) = JRHelper::sort_files($timesort, @tobedone);
     # we choose to not quit on error messages here, but at least let the user know
-    JRHelper::warn_print("While sorting using JobID's ctime: $err")
-      if (! MMisc::is_blank($err));
+    JRHelper::warn_print("While sorting using JobID file's \'$timesort\': $err")
+      if (! JRHelper::is_blank($err));
   }
 
   foreach my $jrc (@tobedone) {
@@ -385,7 +390,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--dironce dir [--dironce dir [...]] [--ctimeSort | --RandomOrder [seed]] [--okquit] [JobRunner_configfile [JobRunner_configfile [...]]]
+$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--dironce dir [--dironce dir [...]] [--timeSort mode | --RandomOrder [seed]] [--okquit] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
@@ -401,7 +406,7 @@ Where:
   --sleep      Specify the sleep time in between sets
   --retryall   When running a different set, retry all previously completed entries (especially useful when when a JobRunner configuration uses \'--badErase\' or \'--RunIfTrue\')
   --dironce    Directory to look for configuration files only once
-  --ctimeSort  Run jobs in configuration files\' order, instead of the order they are provided
+  --timeSort   Run jobs in configuration files\' Access Time, Creation Time, Modification Time order, instead of the order they are provided. Valid values: $ts_okv_txt
   --RandomOrder  Run jobs in random order instead of the order they are provided (can help with multiple lock dir access over NFS if the data is not propagated from server yet) (note: if providing a random seed --which must be over 0-- use different values for multiple JobRunner_Caller, or simply do not provide any and the current \'time\' value will be used)
   --okquit     The default is to exit with the error status if the \"done\" vs \"todo\" count is not the same, this bypass this behavior and exit with the ok status
 
