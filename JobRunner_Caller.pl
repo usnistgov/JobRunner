@@ -91,7 +91,7 @@ my $usage = &set_usage();
 JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:          J       RS           e  h    m opqrs  vw     #
+# Used:          J       RS         c e  h    m opqrs  vw     #
 
 my $toolb = "JobRunner";
 my $tool = JRHelper::cmd_which($toolb);
@@ -107,6 +107,7 @@ my @dironce = ();
 my $passreport = 0;
 my $okquit = 0;
 my $maxSet = -1;
+my $ctimesort = 0;
 
 my %opt = ();
 GetOptions
@@ -125,6 +126,7 @@ GetOptions
    'endSetReport=i' => \$passreport,
    'okquit'     => \$okquit,
    'maxSet=i'   => \$maxSet,
+   'ctimeSort'  => \$ctimesort,
   ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 JRHelper::ok_quit("\n$usage\n\nAutoDection of \'$toolb\' found: $tool\n") if ($opt{'help'});
 JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
@@ -137,6 +139,9 @@ JRHelper::error_quit("Problem with \'$toolb\' tool ($tool): $err")
 
 JRHelper::error_quit("\SleepInBetweenJobs\' values must be positive ($sibj)")
   if ($sibj < 0);
+
+JRHelper::error_quit("\Random\' and \'ctimeSort\' can not be used at the same time")
+  if ((defined $random) && ($ctimesort != 0));
 
 my $randi = 0;
 my $rands = 0;
@@ -197,6 +202,12 @@ do {
 
   if (defined $random) {
     @tobedone = sort _rand @tobedone;
+  }
+  if ($ctimesort) {
+    ($err, @tobedone) = JRHelper::sort_files('ctime', @tobedone);
+    # we choose to not quit on error messages here, but at least let the user know
+    JRHelper::warn_print("While sorting using JobID's ctime: $err")
+      if (! MMisc::is_blank($err));
   }
 
   foreach my $jrc (@tobedone) {
@@ -374,7 +385,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--dironce dir [--dironce dir [...]] [--RandomOrder [seed]] [--okquit] [JobRunner_configfile [JobRunner_configfile [...]]]
+$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--dironce dir [--dironce dir [...]] [--ctimeSort | --RandomOrder [seed]] [--okquit] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
@@ -390,12 +401,13 @@ Where:
   --sleep      Specify the sleep time in between sets
   --retryall   When running a different set, retry all previously completed entries (especially useful when when a JobRunner configuration uses \'--badErase\' or \'--RunIfTrue\')
   --dironce    Directory to look for configuration files only once
+  --ctimeSort  Run jobs in configuration files\' order, instead of the order they are provided
   --RandomOrder  Run jobs in random order instead of the order they are provided (can help with multiple lock dir access over NFS if the data is not propagated from server yet) (note: if providing a random seed --which must be over 0-- use different values for multiple JobRunner_Caller, or simply do not provide any and the current \'time\' value will be used)
   --okquit     The default is to exit with the error status if the \"done\" vs \"todo\" count is not the same, this bypass this behavior and exit with the ok status
 
 *: in this mode, the program will complete a full run then on the files found in this directory, then sleep $dsleepv seconds before re-reading the directory content and see if any new configuration file is present, before running it. The program will never stop, it is left to the user to stop the program.
 
-Job Processing Order: Unless \'--RandomOrder\' is used, jobs are processed in the following order: first the \'--watchdir\' configuration files, then the \'--dironce\' ones, then the command lines ones. Then, if the tool is in \'--watchdir\' mode, it will do a second pass on those files followed by the command line arguments, and the again (until \'--maxSet\' runs)
+Job Processing Order: Unless \'--RandomOrder\' or \'--ctimeSort\' are used, jobs are processed in the following order: first the \'--watchdir\' configuration files, then the \'--dironce\' ones, then the command lines ones. Then, if the tool is in \'--watchdir\' mode, it will do a second pass on those files followed by the command line arguments, and the again (until \'--maxSet\' runs)
 
 WARNING: the tool is designed to pass any 'ctrl+C' keyboard input to the \'JobRunner\' tool. To end a \'JobRunner_Caller\' in \'--watchdir\' mode (before any \'--maxSet\' completion if set) it is recommend to use the \'kill\' or \'killall\' commands, or to \'ctrl+z\' and then \'kill\' the \"suspended\" job
 
