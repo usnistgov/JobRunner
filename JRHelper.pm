@@ -23,9 +23,10 @@ package JRHelper;
 
 use strict;
 
-use File::Temp qw(tempfile tempdir);
+use File::Temp qw(tempdir);
 use Data::Dumper;
 use Cwd qw(cwd abs_path);
+use Time::HiRes qw(gettimeofday tv_interval);
 
 my $version     = '0.1b';
 
@@ -54,9 +55,7 @@ sub get_tmpdir {
 #####
 
 sub get_tmpfilename {
-  my (undef, $name) = tempfile( OPEN => 0 );
-
-  return($name);
+  return(tmpnam());
 }
 
 #####
@@ -836,6 +835,15 @@ sub fast_join {
 
   return($txt);
 }
+
+####################
+
+sub get_currenttime { return([gettimeofday()]); }
+sub get_scalar_currenttime { return(scalar gettimeofday()); }
+
+#####
+
+sub get_elapsedtime { return(tv_interval($_[0])); }
 
 ##########
 
