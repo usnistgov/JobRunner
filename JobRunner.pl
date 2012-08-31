@@ -136,7 +136,7 @@ JRHelper::error_quit("No \'name\' specified, aborting")
 my $toprint2 = (JRHelper::is_blank($toprint)) ? "$toprintd $name : " : "$toprint "; 
 ## From here we ought to use the local error_quit
 
-JRHelper::error_quit("\'0\' or \'1\' are reserved \"SuccessReturnCode\" values")
+JRHelper::error_quit("\'0\' or \'1\' are invalid \"SuccessReturnCode\" values, as they are reserved for normal operations")
   if ((defined $successreturn) && (($successreturn == 0) || ($successreturn == 1)));
 
 foreach my $ddir (@predir) {
