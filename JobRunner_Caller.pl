@@ -93,7 +93,7 @@ my $usage = &set_usage();
 JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:          J       RS           e  h    m opqrst vw     #
+# Used:     E    J L    QRS           e  h    m opqrst vw     #
 
 my $toolb = "JobRunner";
 my $tool = JRHelper::cmd_which($toolb);
@@ -110,6 +110,9 @@ my $passreport = 0;
 my $okquit = 0;
 my $maxSet = -1;
 my $timesort = "";
+my $sp_lt = "";
+my $sp_ltdir = "";
+my $quitfile = JRHelper::get_tmpfilename();
 
 my %opt = ();
 GetOptions
@@ -129,6 +132,9 @@ GetOptions
    'okquit'     => \$okquit,
    'maxSet=i'   => \$maxSet,
    'timeSort=s' => \$timesort,
+   'ExtraLockingTool=s' => \$sp_lt,
+   'LockingToolLockDir=s' => \$sp_ltdir,
+   'QuitFile=s' => \$quitfile,
   ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 JRHelper::ok_quit("\n$usage\n\nAutoDection of \'$toolb\' found: $tool\n") if ($opt{'help'});
 JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
@@ -147,7 +153,18 @@ JRHelper::error_quit("\Random\' and \'timeSort\' can not be used at the same tim
       
 JRHelper::error_quit("Unknow \'timeSort\' value ($timesort), valid options are: $ts_okv_txt")
   if ((! JRHelper::is_blank($timesort)) && (! grep(m%^$timesort$%, @ts_okv)));
-      
+
+if (! JRHelper::is_blank($sp_lt)) {
+  my $err = JRHelper::check_file_x($sp_lt);
+  JRHelper::error_quit("Problem with \'ExtraLockingTool\' ($sp_lt): $err")
+    if (! JRHelper::is_blank($sp_lt));
+  JRHelper::error_quit("When using \'ExtraLockingTool\', a \'LockingToolLockDir\' must be specified")
+    if (JRHelper::is_blank($sp_ltdir));
+  $err = JRHelper::check_dir_w($sp_ltdir);
+  JRHelper::error_quit("Problem with \'LockingToolLockDir\' ($sp_ltdir): $err")
+    if (! JRHelper::is_blank($err));
+}
+
 my $randi = 0;
 my $rands = 0;
 my @randa = ();
@@ -171,7 +188,12 @@ my %notdone = ();
 my %allsetsdone = ();
 my $set = 1;
 
+JRHelper::error_quit("Problem writing to \'QuitFile\' ($quitfile)")
+  if (! JRHelper::writeTo($quitfile, "", 0, 0, JRHelper::get_scalar_currenttime()));
+
 do {
+  print "Reminder: to quit properly after a Job/during a Set, delete the \'QuitFile\': $quitfile\n";
+
   my @tobedone = ();
   %alldone = () if ($retryall);
 
@@ -216,13 +238,31 @@ do {
   }
 
   foreach my $jrc (@tobedone) {
+    next if ($kdi == 0);
+
+    # Check+recreate(touch) QuitFile
+    if (! JRHelper::does_file_exists($quitfile)) {
+      $kdi = 0;
+      next;
+    }
+    JRHelper::error_quit("Problem writing to \'QuitFile\' ($quitfile)")
+      if (! JRHelper::writeTo($quitfile, "", 0, 0, JRHelper::get_scalar_currenttime()));
+
     next if (exists $alldone{$jrc});
 
     $todo{$jrc}++;
 
-    my ($ok, $txt, $ds, $msg) = &doit($jrc);
+    my ($ok, $txt, $ds, $msg, $sp_lf) = &doit($jrc);
     print "$txt\n" if (! JRHelper::is_blank($txt));
-    
+
+    if ($ok == -99) { # not able to mutex this jobid, try later
+      print "  !! Skipping job for now: Unable to obtain ExtraLock ($sp_lf)\n";
+      next;
+    }
+      
+    # release the "mutex"
+    unlink($sp_lf) if (! JRHelper::is_blank($sp_lf));
+
     if ($ok) {
       $done{$jrc}++;
       delete $notdone{$jrc};
@@ -292,7 +332,21 @@ sub __cleanmsg {
 sub doit {
   my ($jrc) = @_;
 
-  # whatever happens here after, we will not redo this entry (at least this set)
+  my $sp_lf = "";
+  if (! JRHelper::is_blank($sp_lt)) {
+   my $file = $jrc;
+   $file =~ s%^.+/%%;
+   $sp_lf = "$sp_ltdir/$file";
+   my @cmd = ($sp_lt, $sp_lf);
+   my ($rc, $so, $se) = JRHelper::do_system_call(@cmd);
+
+   # we were not able to get the lock/mutex ... somebody else is doing this job, skip
+   return(-99) if ($rc != 0);
+
+   # we have the insured mutex, continue
+  }
+
+  # whatever happens after here, we will not redo this entry (at least this set)
   $alldone{$jrc}++;
   $allsetsdone{$jrc}++; # if > 1 it means we have already done it in the past
   # and therefore do not print "skip" info anymore
@@ -301,15 +355,15 @@ sub doit {
 
   my $err = JRHelper::check_file_r($jrc);
   return(0, 
-         ($allsetsdone{$jrc} < 2) 
+         (($allsetsdone{$jrc} < 2) 
          ? "$header\n  !! Skipping -- Problem with file ($jrc): $err"
-         : "", 0, "File Issue: $err") if (! JRHelper::is_blank($err));
+         : ""), 0, "File Issue: $err", $sp_lf) if (! JRHelper::is_blank($err));
   
   $err = &check_header($jrc);
   return(0,
-         ($allsetsdone{$jrc} < 2)
+         (($allsetsdone{$jrc} < 2)
          ? "$header\n  -- Skipping -- $err"
-         : "", 0, $err) if (! JRHelper::is_blank($err));
+         : ""), 0, $err, $sp_lf) if (! JRHelper::is_blank($err));
 
   my $jb_cmd = "$tool -u $jrc";
 
@@ -319,10 +373,10 @@ sub doit {
   return(1,
          ($allsetsdone{$jrc} < 2)
          ? ("$header\n  @@ Can be skipped" . ($verb ? "\n(stdout)$so" : ""))
-         : "", 0, &__cleanmsg($so)) if ($rc == 0);
+         : "", 0, &__cleanmsg($so), $sp_lf) if ($rc == 0);
   
   return(1, "$header\n  ?? Possible Problem" . 
-         ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 0, "Possible Problem") if ($rc == 1);
+         ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 0, "Possible Problem", $sp_lf) if ($rc == 1);
 
   ## To be run ? run it !
   # and now really print the header
@@ -330,10 +384,10 @@ sub doit {
 
   my ($rc, $so, $se) = JRHelper::do_system_call($jb_cmd);
   
-  return(1, "  ++ Job completed" . ($verb ? "\n(stdout)$so" : ""), 1, "")
+  return(1, "  ++ Job completed" . ($verb ? "\n(stdout)$so" : ""), 1, "", $sp_lf)
     if ($rc == 0);
   
-  return(0, "  ** ERROR Run" . ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 1, "ERROR RUN");
+  return(0, "  ** ERROR Run" . ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 1, "ERROR RUN", $sp_lf);
 }
 
 #####
@@ -390,7 +444,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--dironce dir [--dironce dir [...]] [--timeSort mode | --RandomOrder [seed]] [--okquit] [JobRunner_configfile [JobRunner_configfile [...]]]
+$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--dironce dir [--dironce dir [...]] [--timeSort mode | --RandomOrder [seed]] [--okquit] [--ExtraLockingTool tool [--LockingToolLockDir dir]] [--QuitFile location] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
@@ -409,13 +463,20 @@ Where:
   --timeSort   Run jobs in configuration files\' Access Time, Creation Time, Modification Time order, instead of the order they are provided. Valid values: $ts_okv_txt
   --RandomOrder  Run jobs in random order instead of the order they are provided (can help with multiple lock dir access over NFS if the data is not propagated from server yet) (note: if providing a random seed --which must be over 0-- use different values for multiple JobRunner_Caller, or simply do not provide any and the current \'time\' value will be used)
   --okquit     The default is to exit with the error status if the \"done\" vs \"todo\" count is not the same, this bypass this behavior and exit with the ok status
+  --ExtraLockingTool  Specify the full path location of a special locking tool used to create a mutual exclusion for a JobID execution (**)
+  --LockingToolLockDir  Directory in which the ExtraLockingTool lock for JobID will be created
+  --QuitFile   Location of a file that will be created by the tool and used to let it know to stop processing if the file has disappeared (default is to use a random file location, that will be displayed at the beginning of each set)
+
 
 *: in this mode, the program will complete a full run then on the files found in this directory, then sleep \'--sleep\' seconds before re-reading the directory content and see if any new configuration file is present, before running it. The program will never stop, it is left to the user to stop the program.
 
+**: this is extremely important for queues on network shares (such as NFS), specify the tool that is know to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by $0 after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
+
+
 Job Processing Order: Unless \'--RandomOrder\' or \'--ctimeSort\' are used, jobs are processed in the following order: first the \'--watchdir\' configuration files, then the \'--dironce\' ones, then the command lines ones. Then, if the tool is in \'--watchdir\' mode, it will do a second pass on those files followed by the command line arguments, and the again (until \'--maxSet\' runs)
 
-WARNING: the tool is designed to pass any 'ctrl+C' keyboard input to the \'JobRunner\' tool. To end a \'JobRunner_Caller\' in \'--watchdir\' mode (before any \'--maxSet\' completion if set) it is recommend to use the \'kill\' or \'killall\' commands, or to \'ctrl+z\' and then \'kill\' the \"suspended\" job (or to kill it during its \"sleep\" times)
 
+WARNING: the tool is designed to pass any 'ctrl+C' keyboard input to the \'JobRunner\' tool. To end a \'JobRunner_Caller\' in \'--watchdir\' mode (before any \'--maxSet\' completion if set) it is recommend to use the \'kill\' or \'killall\' commands, or to \'ctrl+z\' and then \'kill\' the \"suspended\" job (or to kill it during its \"sleep\" times)
 
 EOF
 ;
