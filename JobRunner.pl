@@ -87,6 +87,8 @@ Getopt::Long::Configure(qw(auto_abbrev no_ignore_case));
 
 my $toprintd = "[JobRunner]";
 my $onlycheck_rc = 99;
+my $jr_mutext_env = 'JOBRUNNER_MUTEXTOOL';
+my $jr_mutexd_env = 'JOBRUNNER_MUTEXLOCKDIR';
 my $usage = &set_usage();
 JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
@@ -155,8 +157,18 @@ if (! JRHelper::is_blank($outconf)) {
 #################### Start processing
 my $toprint2 = (JRHelper::is_blank($toprint)) ? "$toprintd $name : " : "$toprint "; 
 
-# Mutex pre-checks
+#### Mutex pre-checks
+# load them from environment variables (if possible) and not set on the command line
+$sp_lt = ((MMisc::is_blank($sp_lt)) && (exists $ENV{$jr_mutext_env})) ? $ENV{$jr_mutext_env} : "";
+$sp_ltdir = ((MMisc::is_blank($sp_ltdir)) && (exists $ENV{$jr_mutexd_env})) ? $ENV{$jr_mutexd_env} : "";
+# then do some checks
 if (! JRHelper::is_blank($sp_lt)) {
+  # redo those checks in case the environment variables were used
+  JRHelper::error_quit("When using \'mutexTool\', a \'MutexLockDir\' must be specified")
+    if (JRHelper::is_blank($sp_ltdir));
+  JRHelper::error_quit("\'MutexLockDir\' can not be the same as \'lockdir\'")
+    if ($sp_ltdir eq $blockdir);
+  # now some new checks
   my $err = JRHelper::check_file_x($sp_lt);
   JRHelper::error_quit("${toprint2}Problem with \'mutexTool\' ($sp_lt): $err")
     if (! JRHelper::is_blank($sp_lt));
@@ -578,9 +590,9 @@ required_options are:
   --Verbose
       Print more verbose status updates
   --mutexTool tool
-      Specify the full path location of a special locking tool used to create a mutual exclusion to insure JobID exclusive execution (**)
+      Specify the full path location of a special locking tool used to create a mutual exclusion to insure JobID exclusive execution (**). Can be specified globaly using the \'$jr_mutext_env\' environment variable (command line takes precedence)
   --MutexLockDir dir
-      Directory in which the \'mutexTool\' lock for JobID will be created (must be different from \'lockdir\')
+      Directory in which the \'mutexTool\' lock for JobID will be created (must be different from \'lockdir\'). Can be specified globaly using the \'$jr_mutexd_env\' environment variable (command line takes precedence)
   --okquit
       In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
   --SuccessReturnCode
