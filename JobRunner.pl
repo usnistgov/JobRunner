@@ -159,8 +159,8 @@ my $toprint2 = (JRHelper::is_blank($toprint)) ? "$toprintd $name : " : "$toprint
 
 #### Mutex pre-checks
 # load them from environment variables (if possible) and not set on the command line
-$sp_lt = ((MMisc::is_blank($sp_lt)) && (exists $ENV{$jr_mutext_env})) ? $ENV{$jr_mutext_env} : "";
-$sp_ltdir = ((MMisc::is_blank($sp_ltdir)) && (exists $ENV{$jr_mutexd_env})) ? $ENV{$jr_mutexd_env} : "";
+$sp_lt = ((JRHelper::is_blank($sp_lt)) && (exists $ENV{$jr_mutext_env})) ? $ENV{$jr_mutext_env} : "";
+$sp_ltdir = ((JRHelper::is_blank($sp_ltdir)) && (exists $ENV{$jr_mutexd_env})) ? $ENV{$jr_mutexd_env} : "";
 # then do some checks
 if (! JRHelper::is_blank($sp_lt)) {
   # redo those checks in case the environment variables were used
@@ -440,7 +440,7 @@ sub vprint {
 #####
 
 sub __common_quit {
-  print $_[0] if (! MMisc::is_blank($_[0]));
+  print $_[0] if (! JRHelper::is_blank($_[0]));
   unlink($sp_lf) if (! JRHelper::is_blank($sp_lf)); # release the "mutex"
 }
 
