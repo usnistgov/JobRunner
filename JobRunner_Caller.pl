@@ -157,7 +157,7 @@ JRHelper::error_quit("Unknow \'timeSort\' value ($timesort), valid options are: 
 if (! JRHelper::is_blank($sp_lt)) {
   my $err = JRHelper::check_file_x($sp_lt);
   JRHelper::error_quit("Problem with \'ExtraLockingTool\' ($sp_lt): $err")
-    if (! JRHelper::is_blank($sp_lt));
+    if (! JRHelper::is_blank($err));
   JRHelper::error_quit("When using \'ExtraLockingTool\', a \'LockingToolLockDir\' must be specified")
     if (JRHelper::is_blank($sp_ltdir));
   $err = JRHelper::check_dir_w($sp_ltdir);
