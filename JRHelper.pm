@@ -23,7 +23,7 @@ package JRHelper;
 
 use strict;
 
-use File::Temp qw(tempdir);
+use File::Temp qw(tempdir tmpnam);
 use Data::Dumper;
 use Cwd qw(cwd abs_path);
 use Time::HiRes qw(gettimeofday tv_interval);
@@ -55,7 +55,8 @@ sub get_tmpdir {
 #####
 
 sub get_tmpfilename {
-  return(tmpnam());
+  my $file = tmpnam();
+  return($file);
 }
 
 #####
