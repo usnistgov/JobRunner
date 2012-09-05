@@ -255,8 +255,10 @@ do {
     my ($ok, $txt, $ds, $msg, $sp_lf) = &doit($jrc);
     print "$txt\n" if (! JRHelper::is_blank($txt));
 
-    if ($ok == -99) { # not able to mutex this jobid, try later
+    if ((! JRHelper::is_blank($sp_lf)) && ($ok == -99)) {
+      # not able to mutex this jobid, try later
       print "  !! Skipping job for now: Unable to obtain ExtraLock ($sp_lf)\n";
+      $sp_lf = ""; # safeguard
       next;
     }
       
@@ -341,7 +343,7 @@ sub doit {
    my ($rc, $so, $se) = JRHelper::do_system_call(@cmd);
 
    # we were not able to get the lock/mutex ... somebody else is doing this job, skip
-   return(-99) if ($rc != 0);
+   return(-99, "", 0, "", $sp_lf) if ($rc != 0);
 
    # we have the insured mutex, continue
   }
