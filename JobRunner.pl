@@ -121,6 +121,8 @@ my $sp_ltdir = "";
 my $sp_lf = "";
 
 my @cc = ();
+# Sort the options, so that 'useConfig' is first to load the file before the command line override 
+@ARGV = &__sort_options();
 &process_options();
 
 ## Catch some errors before writing config file
@@ -292,14 +294,14 @@ if (JRHelper::does_dir_exists($dsBad)) {
 ##########
 ## Previously done ?
 if (JRHelper::does_dir_exists($dsDone)) {
-  &ec_ok_quit($successreturn, "${toprint2}Previously successfully completed")
-    if (scalar @checkfiles == 0);
-  
   my $flf = (JRHelper::is_blank($rlogfile)) ? "$dsDone/$blogfile" : $rlogfile;
   
   if (JRHelper::does_file_exists($flf)) {
-    &ok_quit("${toprint2}Previously successfully completed, and no files listed in \'checkfile\' is newer than the logfile, not re-runing")
-      if (JRHelper::newest($flf, @checkfiles) eq $flf);
+    if (JRHelper::newest($flf, @checkfiles) eq $flf) { 
+      my $msg = "${toprint2}Previously successfully completed";
+      &ec_ok_quit($successreturn, $msg) if (defined $successreturn);
+      &ok_quit("$msg" . ((scalar @checkfiles > 0) ? ", and no file listed in \'checkfile\' is newer than the logfile, not re-runing" : ""));
+    }
     &vprint("!! ${toprint2}Previously successfully completed, but at least one file listed in \'checkfile\' is newer than the logfile => re-runing");
   } else {
     &vprint("!! ${toprint2}Previously successfully completed, but logfile absent => considering as new run");
@@ -499,6 +501,23 @@ sub _cc2 { push @cc, "--" . $_[0]; push @cc, $_[1]; }
 
 #####
 
+sub __sort_options {
+  my @p = ();
+  my @rest = ();
+  while (my $v = shift @ARGV) {
+    if ($v =~ m%^\-\-?u%) { # useConfig
+      push @p, ($v, shift @ARGV);
+      next;
+    }
+    return(@p, @rest, $v, @ARGV)
+      if ($v =~ m%^\-\-$%); # -- => stop processing
+    push @rest, $v;
+  }
+  return(@p, @rest);
+}
+
+#####
+
 sub process_options {
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
 # Used:   CDE G    LM OP RS  V     bcde gh   lmnop  stuv      #
@@ -552,7 +571,7 @@ sub load_options {
   $tmp = JRHelper::load_memory_object($conf);
   JRHelper::error_quit("Problem with configuration file data ($conf)")
     if (! defined $tmp);
-  push @ARGV, @$tmp;
+  unshift @ARGV, @$tmp; # add to beginning of argument processing to allow for command line override
 }
 
 #####
@@ -596,7 +615,7 @@ required_options are:
   --okquit
       In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
   --SuccessReturnCode
-      If the command line to run was ran successfully (or previously run successfully), return the user provided error code, any other return code indicate a non successful completion (including skipping job)
+      If the command line to run was ran successfully (or previously run successfully with no need to be rerun), return the user provided error code, any other return code indicate a non successful completion (including skipping job)
   --saveConfig file
       Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using \'--useConfig\'
   --useConfig file
