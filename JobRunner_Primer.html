@@ -584,6 +584,40 @@ Using the same idea, we can create an updated configuration file for a <i>jobid<
 Wrote 'saveConfig' file (<i>pwd_path</i>/test8.jobrunner)
 </pre>
 
+Using this method it is possible to create many similar jobs quickly, simply modifying the <code>jobid</code> and <code>excecutable</code> <i>script</i>, but using the same other configuration settings.
+
+For example:
+<pre>
+% JobRunner --useConfig test6.jobrunner --name test9 --executable /bin/pwd --saveConfig `pwd`/test9.jobrunner
+Wrote 'saveConfig' file (<i>pwd_path</i>/test9.jobrunner)
+</pre>
+
+contains the same content as the <code>test6.jobrunner</code> except for the two changes done on the command line, the <code>name</code> and the <code>executable</code>:
+
+<pre>
+# Job Runner Configuration file
+
+$VAR1 = [
+          '--lockdir',
+          'JR_lockd',
+<b>          '--name',
+          'test9',
+          '--executable',
+          '/bin/pwd',</b>
+          '--dirChange',
+          '/tmp',
+          '--checkfile',
+          '<i>pwd_path</i>/required_file',
+          '--Verbose',
+          '--RunIfTrue',
+          '<i>pwd_path</i>/is5minloadok.sh',
+          '--DonePostRun',
+          'touch /tmp/test6_doneok',
+          '--ErrorPostRun',
+          'touch /tmp/test6_error'
+        ];
+</pre>
+
 
 
 
