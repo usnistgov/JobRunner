@@ -121,6 +121,7 @@ my $sp_ltdir = "";
 my $sp_lf = "";
 
 my @cc = ();
+my %ccx = ();
 # Sort the options, so that 'useConfig' is first to load the file before the command line override 
 @ARGV = &__sort_options();
 &process_options();
@@ -496,11 +497,6 @@ sub check_RunIfTrue {
 
 ########################################
 
-sub _cc1 { push @cc, "--" . $_[0]; }
-sub _cc2 { push @cc, "--" . $_[0]; push @cc, $_[1]; } 
-
-#####
-
 sub __sort_options {
   my @p = ();
   my @rest = ();
@@ -518,6 +514,26 @@ sub __sort_options {
 
 #####
 
+sub _cc1 { $ccx{$_[0]} = scalar @cc; push @cc, "--" . $_[0]; }
+sub _ccr1 { # For options for which only one value is authorized, replace previous entry
+  if (exists $ccx{$_[0]}) {
+    $cc[$ccx{$_[0]}] = "--" . $_[0];
+  } else {
+    &_cc1(@_);
+  }
+}
+sub _cc2 { $ccx{$_[0]} = scalar @cc; push @cc, "--" . $_[0]; push @cc, $_[1]; } 
+sub _ccr2 {
+  if (exists $ccx{$_[0]}) {
+    $cc[$ccx{$_[0]}] = "--" . $_[0];
+    $cc[$ccx{$_[0]} + 1] = $_[1];
+  } else {
+    &_cc2(@_);
+  }
+}
+
+#####
+
 sub process_options {
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
 # Used:   CDE G    LM OP RS  V     bcde gh   lmnop  stuv      #
@@ -529,30 +545,30 @@ sub process_options {
      \%opt,
      'help',
      'version',
-     'lockdir=s'   => sub {$blockdir = $_[1]; &_cc2(@_);},
+     'lockdir=s'   => sub {$blockdir = $_[1]; &_ccr2(@_);},
      'checkfile=s' => sub {push @checkfiles, $_[1]; &_cc2(@_);},
-     'name=s'      => sub {$tname = $_[1]; &_cc2(@_)},
+     'name=s'      => sub {$tname = $_[1]; &_ccr2(@_)},
      'Verbose'     => sub {$verb++; &_cc1(@_);},
-     'badErase'    => sub {$redobad++; &_cc1(@_);},
-     'okquit'      => sub {$okquit++; &_cc1(@_);},
+     'badErase'    => sub {$redobad++; &_ccr1(@_);},
+     'okquit'      => sub {$okquit++; &_ccr1(@_);},
      'CreateDir=s' => sub {push @destdir, $_[1]; &_cc2(@_);},
      'preCreateDir=s' => sub {push @predir, $_[1]; &_cc2(@_);},
      'OnlyCheck'   => \$onlycheck,
-     'executable=s' => sub {$executable = $_[1]; &_cc2(@_);},
-     'LogFile=s'   => sub {$rlogfile = $_[1]; &_cc2(@_);},
+     'executable=s' => sub {$executable = $_[1]; &_ccr2(@_);},
+     'LogFile=s'   => sub {$rlogfile = $_[1]; &_ccr2(@_);},
      'saveConfig=s' => \$outconf,
      'useConfig=s'  => sub {&load_options($_[1]);},
-     'dirChange=s'  => sub {$dirchange = $_[1]; &_cc2(@_);},
+     'dirChange=s'  => sub {$dirchange = $_[1]; &_ccr2(@_);},
      'RunIfTrue=s'  => sub {push @runiftrue, $_[1]; &_cc2(@_);},
-     'DonePostRun=s'  => sub {$postrun_Done  = $_[1]; &_cc2(@_);},
-     'ErrorPostRun=s' => sub {$postrun_Error = $_[1]; &_cc2(@_);},
-     'PostRunChangeDir=s' => sub {$postrun_cd = $_[1]; &_cc2(@_);},
-     'goRunInLock'    => sub {$gril = 1; &_cc1(@_);},
-     'GoRunInDir=s'   => sub {$grid = $_[1]; &_cc2(@_);},
-     'toPrint=s'      => sub {$toprint = $_[1]; &_cc2(@_);},
-     'SuccessReturnCode=i' => sub {$successreturn = $_[1]; &_cc2(@_);},
-     'mutexTool=s' => sub {$sp_lt = $_[1]; &_cc2(@_);},
-     'MutexLockDir=s' => sub {$sp_ltdir = $_[1]; &_cc2(@_);},
+     'DonePostRun=s'  => sub {$postrun_Done  = $_[1]; &_ccr2(@_);},
+     'ErrorPostRun=s' => sub {$postrun_Error = $_[1]; &_ccr2(@_);},
+     'PostRunChangeDir=s' => sub {$postrun_cd = $_[1]; &_ccr2(@_);},
+     'goRunInLock'    => sub {$gril = 1; &_ccr1(@_);},
+     'GoRunInDir=s'   => sub {$grid = $_[1]; &_ccr2(@_);},
+     'toPrint=s'      => sub {$toprint = $_[1]; &_ccr2(@_);},
+     'SuccessReturnCode=i' => sub {$successreturn = $_[1]; &_ccr2(@_);},
+     'mutexTool=s' => sub {$sp_lt = $_[1]; &_ccr2(@_);},
+     'MutexLockDir=s' => sub {$sp_ltdir = $_[1]; &_ccr2(@_);},
     ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
   JRHelper::ok_quit("\n$usage\n") if ($opt{'help'});
   JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
