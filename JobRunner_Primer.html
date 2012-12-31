@@ -4,13 +4,13 @@
 <meta content="text/html; charset=ISO-8859-1" http-equiv="Content-Type">
 <title>JobRunner Primer</title>
 <style type="text/css">
-  body { counter-reset: chapter; }
-  h2:before { content: counter(chapter) ". "; counter-increment: chapter;  /* Add 1 to chapter */ }
-  h2 { counter-reset: section subsection; /* Set section to 0 */ }
-  h3:before { content: counter(chapter) "." counter(section) " "; counter-increment: section; }
-  h3 { counter-reset: subsection; }
-  h4:before { content: counter(chapter) "." counter(section) "." counter(subsection) " "; counter-increment: subsection; }
-  a {text-decoration:none}
+  body { counter-reset: chapter 0; }
+  h2:before { counter-increment: chapter; content: counter(chapter) ". "; }
+  h2 { counter-reset: section 0; }
+  h3:before { counter-increment: section; content: counter(chapter) "." counter(section) ". "; }
+  h3 { counter-reset: subsection 0; }
+  h4:before { counter-increment: subsection; content: counter(chapter) "." counter(section) "." counter(subsection) ". "; }
+  a {text-decoration:none;}
   pre { border-style: solid; border-width: 1px; margin-left: 5px; padding: 2px 2px 2px 2px; background-color: #DDDDDD; 
 /* from: http://forums.techguy.org/web-design-development/249849-forcing-long-text-lines-wrap.html */
 white-space: -moz-pre-wrap; /* Mozilla, supported since 1999 */
@@ -25,7 +25,7 @@ word-wrap: break-word; /* IE 5.5+ */
 
 <div style="text-align: center;"><big><big><big>JobRunner Primer</big></big></big><br>
 </div>
-<div style="text-align: center;"><small>Last modified: June 28th, 2011</small><br>
+<div style="text-align: center;"><small>Last modified: December 31st, 2012</small><br>
 </div>
  <br>
 
@@ -131,7 +131,7 @@ required_options are:
       If the executable or run command did not exit successfully, run specified script
 
 
-**: this is extremely important for queues on network shares (such as NFS), specify the tool that is know to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by ./JobRunner.pl after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
+**: this is extremely important for queues on network shares (such as NFS), specify the tool that is know to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by JobRunner after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
 </pre>
 
 <code>mutexTool</code> Note: for our use over NFS, we have relied on the
@@ -619,10 +619,6 @@ $VAR1 = [
 </pre>
 
 
-
-
-
-
 <a name="JobRunner_Caller">
 <h2>JobRunner_Caller</h2>
 </a>
@@ -630,7 +626,7 @@ $VAR1 = [
 <h3>Command line options</h3>
 
 <pre>
-JobRunner_Caller [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--dironce dir [--dironce dir [...]] [--timeSort mode | --RandomOrder [seed]] [--okquit] [--ExtraLockingTool tool [--LockingToolLockDir dir]] [--QuitFile location] [JobRunner_configfile [JobRunner_configfile [...]]]
+JobRunner_Caller [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--DirOnceBefore dir [--DirOnceBefore dir [...]]] [--dironce dir [--dironce dir [...]]] [--timeSort mode | --RandomOrder [seed]] [--okquit] [--ExtraLockingTool tool [--LockingToolLockDir dir]] [--QuitFile location] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
@@ -645,7 +641,8 @@ Where:
   --maxSet     Specify the maximum number of set to to in 'watchdir' mode (default is to continue without end)
   --sleep      Specify the sleep time in between sets (default: 60)
   --retryall   When running a different set, retry all previously completed entries (especially useful when when a JobRunner configuration uses '--badErase' or '--RunIfTrue')
-  --dironce    Directory to look for configuration files only once
+  --DirOnceBefore    Directory to look for configuration files only once (before '--watchdir')
+  --dironce    Directory to look for configuration files only once (after '--watchdir')
   --timeSort   Run jobs in configuration files' Access Time, Creation Time, Modification Time order, instead of the order they are provided. Valid values: atime ctime mtime
   --RandomOrder  Run jobs in random order instead of the order they are provided (can help with multiple lock dir access over NFS if the data is not propagated from server yet) (note: if providing a random seed --which must be over 0-- use different values for multiple JobRunner_Caller, or simply do not provide any and the current 'time' value will be used)
   --okquit     The default is to exit with the error status if the "done" vs "todo" count is not the same, this bypass this behavior and exit with the ok status
@@ -656,17 +653,120 @@ Where:
 
 *: in this mode, the program will complete a full run then on the files found in this directory, then sleep '--sleep' seconds before re-reading the directory content and see if any new configuration file is present, before running it. The program will never stop, it is left to the user to stop the program.
 
-**: this is extremely important for queues on network shares (such as NFS), specify the tool that is know to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by ./JobRunner_Caller.pl after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
+**: this is extremely important for queues on network shares (such as NFS), specify the tool that is know to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by JobRunner_Caller after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
 
 
-Job Processing Order: Unless '--RandomOrder' or '--ctimeSort' are used, jobs are processed in the following order: first the '--watchdir' configuration files, then the '--dironce' ones, then the command lines ones. Then, if the tool is in '--watchdir' mode, it will do a second pass on those files followed by the command line arguments, and the again (until '--maxSet' runs)
-
+Job Processing Order: Unless '--RandomOrder' or '--ctimeSort' are used, jobs are processed in the following order: first the '--DirOnceBefore' configuration files, then the '--watchdir' configuration files, followed by the '--dironce' ones, finally the command lines ones. Then, if the tool is in '--watchdir' mode, it will do an infinite number of passes on those files (unless '--maxSet' runs if used)
 
 WARNING: the tool is designed to pass any 'ctrl+C' keyboard input to the 'JobRunner' tool. To end a 'JobRunner_Caller' in '--watchdir' mode (before any '--maxSet' completion if set) it is recommend to use the 'kill' or 'killall' commands, or to 'ctrl+z' and then 'kill' the "suspended" job (or to kill it during its "sleep" times)
 </pre>
 
-<code>JobRunner_Caller</code>'s purpose is to execute 
+<code>JobRunner_Caller</code>'s purpose is to execute <i>JobRunner</i> on its <i>configuration files</i>. The entire decision on wether a job is to be run is done by <i>JobRunner</i> itself.
 
+<h3>Processing order</h3>
+
+<ul>
+  <li>Create the <code>quitfile</code>
+  <li>Set <i>KeepDoingIt</i> to <i>true</i> if <code>watchdir</code> is used, <i>false</i> otherwise
+  <li>Run a <i>Set</i>:
+  <ul>
+    <li>Generate a <i>ToBeDone</i> list by adding to it:
+    <ol>
+      <li>Entries found in the <code>DirOnceBefore</code> directory (only first <i>set</i>) 
+      <li>Entries found in the <code>watchdir</code> directory
+      <li>Entries found in the <code>dironce</code> directory (only first <i>set</i>)
+      <li>Command line provided <i>JobRunner configuration files</i> 
+    </ol>
+    <li>If <code>RandomOrder</code> or <code>timeSort</code> is used, apply it to the <i>ToBeDone</i> list
+    <li>For each <i>Job</i> in <i>ToBeDone</i>:
+    <ul>
+      <li>Check if the <code>QuitFile</code> still exists; if it does not, set <i>KeepDoingIt</i> to <i>false</i> and exit loop
+      <li><b>Run <i>Job</i> using <i>JobRunner</i></b>
+    </ul>
+    <li>If used, decrease <code>maxSet</code>. If <i>0</i>, turn <i>KeepDoingIt</i> to <i>false</i> 
+  </ul>
+  <li>If <i>KeepDoingIt</i> is set to <i>true</i>, run the next <i>Set</i>
+</ul>
+    
+<h3>Examples of use</h3>
+
+<h4>Running a set of jobs</h4>
+
+In its simplest use, the tool is designed to run <i>JobRunner</i> configuration files. For example, the <code>test6.jobrunner</code>, <code>test8.jobrunner</code> and <code>test9.jobrunner</code> jobs created earlier:
+
+<pre>
+% JobRunner_Caller test6.jobrunner test8.jobrunner test9.jobrunner
+Reminder: to quit properly after a Job/during a Set, delete the 'QuitFile': <i>/tmpdir</i>/Gv6LCnydsw
+
+
+[**] Job Runner Config: '/Users/martial/Works/JobRunner/test6.jobrunner'
+  @@ Can be skipped
+(stdout)[Warning] [JobRunner] test6 : dirChange -- Current directory changed to '/tmp'
+[JobRunner] test6 : Previously successfully completed, and no file listed in 'checkfile' is newer than the logfile, not re-runing
+
+
+[**] Job Runner Config: './test8.jobrunner'
+  ++ Job completed
+(stdout)[Warning] [JobRunner] test8 : dirChange -- Current directory changed to '/tmp'
+[JobRunner] test8 : == 'RunIfTrue' check OK (/Users/martial/Works/JobRunner/is5minloadok.sh)
+[JobRunner] test8 : %% In progress: 
+
+[JobRunner] test8 : ++ Creating "In Progress" lock dir
+[JobRunner] test8 : %% OK Post Running: 'touch /tmp/test6_doneok'
+
+[JobRunner] test8 : Job successfully completed
+
+
+[**] Job Runner Config: './test9.jobrunner'
+  ++ Job completed
+(stdout)[Warning] [JobRunner] test9 : dirChange -- Current directory changed to '/tmp'
+[JobRunner] test9 : == 'RunIfTrue' check OK (/Users/martial/Works/JobRunner/is5minloadok.sh)
+[JobRunner] test9 : %% In progress: 
+
+[JobRunner] test9 : ++ Creating "In Progress" lock dir
+[JobRunner] test9 : %% OK Post Running: 'touch /tmp/test6_doneok'
+
+[JobRunner] test9 : Job successfully completed
+
+
+%%%%%%%%%% Set 1 run results: 3 / 3 %%%%%%%%%%
+Done (3 / 3)
+</pre>
+
+As can be seen, <code>test6.jobrunner</code> was already run in the past, but <code>test8.jobrunner</code> and <code>test9.jobrunner</code> were not yet, so <i>JobRunner_Caller</i> just insured that those were called in the order they were entered on the command line.
+
+<h4>Queue modes</h4>
+
+When using a <code>watchdir</code> the tool will never exit, unless deletetion of the <code>quitfile</code>; this mode is used to run a <i>queue processor</i>:
+
+<pre>
+% JobRunner_Caller --watchdir watchdir_dir
+</pre>
+
+One <code>JobRunner_Caller</code> equals to one <i>queue processor</i>. To have multiple of those run as many <code>JobRunner_Caller</code> as you want <i>queue processor</i> per <i>system</i>. For example to run three <i>queue processors</i> on a system called <i>linux1</i>, in multiple shells:
+<pre>
+linux1:shell1 % JobRunner_Caller --watchdir watchdir_dir
+linux1:shell2 % JobRunner_Caller --watchdir watchdir_dir
+linux1:shell3 % JobRunner_Caller --watchdir watchdir_dir
+</pre>
+
+It is therefore possible to run a set number of <i>queue processors</i> on a limitless number of systems as long as they share the <code>watchdir</code> and <i>JobRunner</i>'s <code>lockdir</code> directories. For example, to run one <i>queue processor</i> on the <i>linux1</i> and two on the <i>linux2</i> system:
+<pre>
+linux1:shell1 % JobRunner_Caller --watchdir watchdir_dir
+
+linux2:shell1 % JobRunner_Caller --watchdir watchdir_dir
+linux2:shell2 % JobRunner_Caller --watchdir watchdir_dir
+</pre>
+When doing so it is often important to keep in mind that the directory sharing often does not insure mutual exclusion of the lock directory creation, and it might be important to use the <code>ExtraLockingTool</code> and <code>LockingToolLockDir</code> command line options.
+
+Running the tool on a non-homogenous set of system is also possible; given that the <i>job selection</i> process is done using the <i>jobid</i>, it is possible to create a set of <i>JobRunner configuration files</i> that are specific to a given operating system, in order to optimize processing time. For example to run one queue on a linux system, and one queue on a Mac OSX system:
+<pre>
+linux1:shell1 % JobRunner_Caller --watchdir anyOSjobs_dir --watchdir linuxOnly_dir
+
+osx1:shell1 % JobRunner_Caller --watchdir anyOSjobs_dir --watchdir OSXOnly_dir
+</pre>
+The <i>linux1</i> system will try to process jobs that are both in <code>anyOSjobs_dir</code> and <code>linuxOnly_dir</code>, while the <i>osx1</i>  system will try to process jobs that are both in <code>anyOSjobs_dir</code> and <code>OSXOnly_dir</code>. So if a <i>jobid</i> <code>complexJob99.jobrunner</i> is present both in <code>linuxOnly_dir</code> and <code>OSXOnly_dir</code> in its <i>linux</i> and <i>OSX</i> executable equivalents, the first system to be available will complete that <i>job</i> and the other system will see that the <i>jobid</i> is used in <i>JobRunner</i>'s <code>lockdir</code> already, and will skip it from being reprocessed.
+In this example, a <code>anyOSjobs_dir</code> is also used to contain any <i>job</i> that can be run on either operating system.
 
 <!-- check in /slp/SLRE/jobrunner/mx5/mic-interview/ there are a lot -->
 <!-- of examples in there (and in /slp/SLRE2/jobrunner) -->
