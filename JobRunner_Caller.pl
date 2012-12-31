@@ -93,7 +93,7 @@ my $usage = &set_usage();
 JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:     E    J L    QRS           e  h    m opqrst vw     #
+# Used:    DE    J L    QRS          de  h    m o qrst vw     #
 
 my $toolb = "JobRunner";
 my $tool = JRHelper::cmd_which($toolb);
@@ -106,6 +106,7 @@ my $verb = 1;
 my $random = undef;
 my $sibj = 0;
 my @dironce = ();
+my @dironcebefore = ();
 my $passreport = 0;
 my $okquit = 0;
 my $maxSet = -1;
@@ -128,6 +129,7 @@ GetOptions
    'RandomOrder:-99' => \$random,
    'SleepInBetweenJobs=i' => \$sibj,
    'dironce=s'      => \@dironce,
+   'DirOnceBefore=s' => \@dironcebefore,
    'endSetReport=i' => \$passreport,
    'okquit'     => \$okquit,
    'maxSet=i'   => \$maxSet,
@@ -176,7 +178,7 @@ if (defined $random) {
   set_randa(10000);
 }
 
-my $kdi = scalar @watchdir; # keep doing it
+my $kdi = 1; # keep doing it
 
 my %alldone = ();
 my %todo = ();
@@ -188,8 +190,25 @@ my %notdone = ();
 my %allsetsdone = ();
 my $set = 1;
 
+# Infinite run unless not in watchdir mode (and no maxSet requested)
+$maxSet = 1 if (($maxSet == -1) && (scalar @watchdir == 0));
+# create the quitfile
 JRHelper::error_quit("Problem writing to \'QuitFile\' ($quitfile)")
   if (! JRHelper::writeTo($quitfile, "", 0, 0, JRHelper::get_scalar_currenttime()));
+
+sub __add2tobedone {
+  my ($dir, $rtobedone, $ralldone) = @_;
+
+  my $err = JRHelper::check_dir_r($dir);
+  JRHelper::error_quit("Problem with directory ($dir): $err")
+    if (! JRHelper::is_blank($err));
+  my @in = JRHelper::get_files_list($dir);
+  foreach my $file (@in) {
+    my $ff = "$dir/$file";
+    next if (exists $$ralldone{$ff});
+    push @$rtobedone, $ff;
+  }
+}
 
 do {
   print "Reminder: to quit properly after a Job/during a Set, delete the \'QuitFile\': $quitfile\n";
@@ -197,35 +216,16 @@ do {
   my @tobedone = ();
   %alldone = () if ($retryall);
 
-  foreach my $dir (@watchdir) {
-    my $err = JRHelper::check_dir_r($dir);
-    JRHelper::error_quit("Problem with directory ($dir): $err")
-      if (! JRHelper::is_blank($err));
-    my @in = JRHelper::get_files_list($dir);
-    foreach my $file (@in) {
-      my $ff = "$dir/$file";
-      next if (exists $alldone{$ff});
-      push @tobedone, $ff;
-    }
-  }
+  while (my $dir = shift @dironcebefore) { &__add2tobedone($dir, \@tobedone, \%alldone); }
 
-  while (my $dir = shift @dironce) {
-    my $err = JRHelper::check_dir_r($dir);
-    JRHelper::error_quit("Problem with directory ($dir): $err")
-      if (! JRHelper::is_blank($err));
-    my @in = JRHelper::get_files_list($dir);
-    foreach my $file (@in) {
-      my $ff = "$dir/$file";
-      next if (exists $alldone{$ff});
-      push @tobedone, $ff;
-    }
-  }
+  foreach my $dir (@watchdir) { &__add2tobedone($dir, \@tobedone, \%alldone); }
+
+  while (my $dir = shift @dironce) { &__add2tobedone($dir, \@tobedone, \%alldone); }
 
   foreach my $file (@ARGV) {
     next if (exists $alldone{$file});
     push @tobedone, $file;
   }
-
 
   if (defined $random) {
     @tobedone = sort _rand @tobedone;
@@ -446,7 +446,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--dironce dir [--dironce dir [...]] [--timeSort mode | --RandomOrder [seed]] [--okquit] [--ExtraLockingTool tool [--LockingToolLockDir dir]] [--QuitFile location] [JobRunner_configfile [JobRunner_configfile [...]]]
+$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--DirOnceBefore dir [--DirOnceBefore dir [...]]] [--dironce dir [--dironce dir [...]]] [--timeSort mode | --RandomOrder [seed]] [--okquit] [--ExtraLockingTool tool [--LockingToolLockDir dir]] [--QuitFile location] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
@@ -461,7 +461,8 @@ Where:
   --maxSet     Specify the maximum number of set to to in \'watchdir\' mode (default is to continue without end)
   --sleep      Specify the sleep time in between sets (default: $dsleepv)
   --retryall   When running a different set, retry all previously completed entries (especially useful when when a JobRunner configuration uses \'--badErase\' or \'--RunIfTrue\')
-  --dironce    Directory to look for configuration files only once
+  --DirOnceBefore    Directory to look for configuration files only once (before \'--watchdir\')
+  --dironce    Directory to look for configuration files only once (after \'--watchdir\')
   --timeSort   Run jobs in configuration files\' Access Time, Creation Time, Modification Time order, instead of the order they are provided. Valid values: $ts_okv_txt
   --RandomOrder  Run jobs in random order instead of the order they are provided (can help with multiple lock dir access over NFS if the data is not propagated from server yet) (note: if providing a random seed --which must be over 0-- use different values for multiple JobRunner_Caller, or simply do not provide any and the current \'time\' value will be used)
   --okquit     The default is to exit with the error status if the \"done\" vs \"todo\" count is not the same, this bypass this behavior and exit with the ok status
@@ -475,8 +476,7 @@ Where:
 **: this is extremely important for queues on network shares (such as NFS), specify the tool that is know to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by $0 after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
 
 
-Job Processing Order: Unless \'--RandomOrder\' or \'--ctimeSort\' are used, jobs are processed in the following order: first the \'--watchdir\' configuration files, then the \'--dironce\' ones, then the command lines ones. Then, if the tool is in \'--watchdir\' mode, it will do a second pass on those files followed by the command line arguments, and the again (until \'--maxSet\' runs)
-
+Job Processing Order: Unless \'--RandomOrder\' or \'--ctimeSort\' are used, jobs are processed in the following order: first the \'--DirOnceBefore\' configuration files, then the \'--watchdir\' configuration files, followed by the \'--dironce\' ones, finally the command lines ones. Then, if the tool is in \'--watchdir\' mode, it will do an infinite number of passes on those files (unless \'--maxSet\' runs if used)
 
 WARNING: the tool is designed to pass any 'ctrl+C' keyboard input to the \'JobRunner\' tool. To end a \'JobRunner_Caller\' in \'--watchdir\' mode (before any \'--maxSet\' completion if set) it is recommend to use the \'kill\' or \'killall\' commands, or to \'ctrl+z\' and then \'kill\' the \"suspended\" job (or to kill it during its \"sleep\" times)
 
