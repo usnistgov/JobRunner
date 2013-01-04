@@ -631,7 +631,7 @@ required_options are:
   --okquit
       In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
   --SuccessReturnCode
-      If the command line to run was ran successfully (or previously run successfully with no need to be rerun), return the user provided error code, any other return code indicate a non successful completion (including skipping job)
+      If the command line to run was run successfully (or previously run successfully with no need to be rerun), return the user provided error code, any other return code indicates a non successful completion (including skipping job)
   --saveConfig file
       Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using \'--useConfig\'
   --useConfig file
@@ -649,7 +649,7 @@ required_options are:
   --checkfile file [--checkfile file [...]]
       check that the required file is present before accepting to run this job. When a successful run is present, check if the file date is newer than the successful run\'s logfile to decide if a re-run is necessary.
   --RunIfTrue executable [--RunIfTrue executable [...]]
-      Check that given program (no arguments accepted) returns true (0 exit status) to run job, otherwise do not run job (will still be available for later rerun)
+      Check that given program (no arguments accepted) returns the ok exit status (0) to run job, otherwise do not run job (will still be available for later rerun)
   --badErase
       If a bad run is present, erase its run lock directory so it can be retried
   --Onlycheck
@@ -674,7 +674,7 @@ required_options are:
       If the executable or run command did not exit successfully, run specified script
 
 
-**: this is extremely important for queues on network shares (such as NFS), specify the tool that is know to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by $0 after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
+**: this is extremely important for queues on network shares (such as NFS), specify the tool that is known to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by $0 after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
 
 
 EOF

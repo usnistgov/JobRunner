@@ -33,7 +33,7 @@ word-wrap: break-word; /* IE 5.5+ */
 
 <b>JobRunner</b> is a tool designed to <i>run</i> a <i>job</i>, ie to
 execute a command line or script that does not require user
-interaction, and take care of storing the
+interaction, and takes care of storing the
 program's output (standard error and standard out) in an easy to read
 log file. The tool is able to save <i>configuration files</i> (or
 "<i>job description</i>") of the <i>job</i> to be run.<br>
@@ -88,7 +88,7 @@ required_options are:
   --okquit
       In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
   --SuccessReturnCode
-      If the command line to run was ran successfully (or previously run successfully), return the user provided error code, any other return code indicate a non successful completion (including skipping job)
+      If the command line to run was run successfully (or previously run successfully), return the user provided error code, any other return code indicates a non successful completion (including skipping job)
   --saveConfig file
       Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using '--useConfig'
   --useConfig file
@@ -106,7 +106,7 @@ required_options are:
   --checkfile file [--checkfile file [...]]
       check that the required file is present before accepting to run this job. When a successful run is present, check if the file date is newer than the successful run's logfile to decide if a re-run is necessary.
   --RunIfTrue executable [--RunIfTrue executable [...]]
-      Check that given program (no arguments accepted) returns true (0 exit status) to run job, otherwise do not run job (will still be available for later rerun)
+      Check that given program (no arguments accepted) returns the ok exit status (0) to run job, otherwise do not run job (will still be available for later rerun)
   --badErase
       If a bad run is present, erase its run lock directory so it can be retried
   --Onlycheck
@@ -131,7 +131,7 @@ required_options are:
       If the executable or run command did not exit successfully, run specified script
 
 
-**: this is extremely important for queues on network shares (such as NFS), specify the tool that is know to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by JobRunner after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
+**: this is extremely important for queues on network shares (such as NFS), specify the tool that is known to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by JobRunner after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
 </pre>
 
 <code>mutexTool</code> Note: for our use over NFS, we have relied on the
@@ -156,20 +156,20 @@ rlock --timeout=60 --max_age 864000 --suspend 10 $lfile
 
 In its simplest form, the tool is run either as:
 <pre>
-JobRunner --lockdir ldir --name jobid -- commandline
+JobRunner --lockdir ldir --name jobid -- commandline_to_run
 </pre>
 or
 <pre>
 JobRunner --lockdir ldir --name jobid --executable script
 </pre>
 
-The first form use the information on the commandline as the <i>job</i>
-<i>command</i>.
-The second form use the <code>script</code> as the <i>job</i> <i>command</i>.
+The first form uses the information on the commandline as the <i>job</i>
+<i>commandline_to_run</i>.
+The second form uses the <i>executable</i> <code>script</code> as the <i>job</i> <i>command</i>.
 
 <h3>Job processing</h3>
 
-In order to understand how the tool work, one must understand its use
+In order to understand how the tool works, one must understand its use
 of <i>Lock directories</i>.
 
 Those allow for <i>jobs</i> to only be run once and allow
@@ -330,7 +330,7 @@ both the <code>test_____done</code> and <code>test2_____done</code> directories.
 
 <h4>"Hello World !" (version 2)</h4>
 
-After trying to run a command line though <b>JobRunner</b>, let us try
+After trying to run a command line through <b>JobRunner</b>, let us try
 the <code>executable</code> script version, for that we create a
 <code>hello_world.bash</code> file containing:
 <pre>
