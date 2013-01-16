@@ -89,6 +89,8 @@ required_options are:
       In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
   --SuccessReturnCode
       If the command line to run was run successfully (or previously run successfully), return the user provided error code, any other return code indicates a non successful completion (including skipping job)
+  --ignoreChildSignal
+      Do not exit with error if the job exited on a SIGNAL. The default is to consider any signal an error condition (ex: SIGINT) 
   --saveConfig file
       Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using '--useConfig'
   --useConfig file
@@ -249,7 +251,7 @@ When a <b>JobRunner</b> command line is executed:
   requested directory
   <li>depending on the <i>job</i> exit status:
   <ul>
-    <li>for <i>ok</i> exit status
+    <li>for <i>ok</i> exit status (and no <i>SIGNALs</i> --unless ignored)
     <ul>
       <li>if requested, run the <code>DonePostRun</code> script (will
       only print a warning message if it did not complete with an
@@ -260,7 +262,7 @@ When a <b>JobRunner</b> command line is executed:
       <code>SuccessReturnCode</code> was requested, in which case
       return with that status.
     </ul>
-    <li>for <i>non ok</i> exit status
+    <li>for <i>non ok</i> exit status (or any <i>SIGNAL</i> --if not ignored)
     <ul>
       <li>if requested, run the <code>ErrorPostRun</code> script (will
       only print a warning message if it did not complete with an
@@ -293,6 +295,7 @@ only contains the <code>logfile</code> whose content is as follow:
 <pre>
 [[COMMANDLINE]] echo "Hello World !"
 [[RETURN CODE]] 0
+[[SIGNAL]] 0
 [[STDOUT]]
 Hello World !
 
@@ -303,6 +306,7 @@ In it we can see that:
   <li>the <code>COMMANDLINE</code> ran was <code>echo "Hello World !"</code>
   <li>the <code>RETURN CODE</code> of the command line execution was
   <code>0</code>, the <i>ok</i> status
+  <li>no <code>SIGNAL</code> (<code>0</code>) was used on the command line execution
   <li>the expected result of the command was printed on
   <code>STDOUT</code>
   <li>nothing was print on <code>STDERR</code>
