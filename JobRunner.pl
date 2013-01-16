@@ -119,6 +119,7 @@ my $successreturn = undef;
 my $sp_lt = "";
 my $sp_ltdir = "";
 my $sp_lf = "";
+my $ics = 0;
 
 my @cc = ();
 my %ccx = ();
@@ -333,7 +334,7 @@ if ($onlycheck) {
 
 # In case the user use Ctrl+C do not return "ok"
 sub SIGINTh { &error_quit("${toprint2}\'Ctrl+C\'-ed, exiting with error status"); }
-$SIG{'INT'} = 'SIGINTh';
+$SIG{'INT'} = \&SIGINTh;
 
 &vprint("${toprint2}++ Creating \"In Progress\" lock dir");
 &error_quit("${toprint2}Could not create writable dir ($dsRun)")
@@ -368,11 +369,13 @@ if (! JRHelper::is_blank($grid)) {
   JRHelper::warn_print("${toprint2}GoRunInDir -- Current directory changed to \'$grid\'");
 }
 
-my ($rv, $tx, $so, $se, $retcode, $flogfile)
+my ($rv, $tx, $so, $se, $retcode, $flogfile, $signal)
   = JRHelper::write_syscall_logfile
   ($flf, (defined $executable) ? $executable : @ARGV);
 &vprint("${toprint2}-- Final Logfile different from expected one: $flogfile")
   if ($flogfile ne $flf);
+
+$signal = ($ics == 1) ? 0 : $signal;
 
 if (! JRHelper::is_blank($postrun_cd)) {
   if (! chdir($postrun_cd)) {
@@ -382,7 +385,7 @@ if (! JRHelper::is_blank($postrun_cd)) {
   JRHelper::warn_print("${toprint2}PostRunChangeDir -- Current directory changed to \'$postrun_cd\'");
 }
 
-if ($retcode == 0) {
+if (($retcode == 0) && ($signal == 0)) {
   &rod($dsRun, $dsDone); # Move to "ok" status
   if (! JRHelper::is_blank($postrun_Done)) {
     &vprint("${toprint2}%% OK Post Running: \'$postrun_Done\'\n");
@@ -536,7 +539,7 @@ sub _ccr2 {
 
 sub process_options {
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:   CDE G    LM OP RS  V     bcde gh   lmnop  stuv      #
+# Used:   CDE G    LM OP RS  V     bcde ghi  lmnop  stuv      #
 
   my %opt = ();
 
@@ -569,6 +572,7 @@ sub process_options {
      'SuccessReturnCode=i' => sub {$successreturn = $_[1]; &_ccr2(@_);},
      'mutexTool=s' => sub {$sp_lt = $_[1]; &_ccr2(@_);},
      'MutexLockDir=s' => sub {$sp_ltdir = $_[1]; &_ccr2(@_);},
+     'ignoreChildSignal' => sub {$ics = 1; &_cc1(@_);},
     ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
   JRHelper::ok_quit("\n$usage\n") if ($opt{'help'});
   JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
@@ -632,6 +636,8 @@ required_options are:
       In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
   --SuccessReturnCode
       If the command line to run was run successfully (or previously run successfully with no need to be rerun), return the user provided error code, any other return code indicates a non successful completion (including skipping job)
+  --ignoreChildSignal
+      Do not exit with error if the job exited on a SIGNAL. The default is to consider any signal an error condition (ex: SIGINT) 
   --saveConfig file
       Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using \'--useConfig\'
   --useConfig file
