@@ -591,7 +591,25 @@ sub load_options {
   $tmp = JRHelper::load_memory_object($conf);
   JRHelper::error_quit("Problem with configuration file data ($conf)")
     if (! defined $tmp);
-  unshift @ARGV, @$tmp; # add to beginning of argument processing to allow for command line override
+  # Find the '--'
+  my @pre = ();
+  my $doit = 1;
+  while ($doit == 1 && scalar @$tmp > 0) {
+    if ($$tmp[0] == '--') {
+      $doit = 0;
+      next;
+    }
+    push @pre, shift @$tmp;
+  }
+  
+
+  if (scalar @pre > 0) {
+    unshift @ARGV, @pre; # add to beginning of argument processing entries before '--' to allow for command line override
+  }
+
+  if (scalar @$tmp > 0) {
+    push @ARGV, @$tmp; # add to the end components after '--'
+  }
 }
 
 #####
