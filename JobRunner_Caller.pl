@@ -377,8 +377,23 @@ sub doit {
          ? ("$header\n  @@ Can be skipped" . ($verb ? "\n(stdout)$so" : ""))
          : "", 0, &__cleanmsg($so), $sp_lf) if ($rc == 0);
   
-  return(1, "$header\n  ?? Possible Problem" . 
-         ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 0, "Possible Problem", $sp_lf) if ($rc == 1);
+  if ($rc == 1) {
+    if (JRHelper::is_blank($se)) { # no warning, check if all "errors" are just "Problem with 'checkfile' [file] : file does not exist"
+      my @errs = split(m%\n%, $so);
+      my $cfc = 1;
+      foreach my $errline (@errs) {
+        $errline =~ s%^\[ERROR\]\s*%%;
+        next if (JRHelper::is_blank($errline));
+        next if ($errline =~ m%Problem with \'checkfile\'%);
+        $cfc = 0;
+        last;
+      }
+      return(1, "$header\n  == Awaiting for \'checkfile\'", 0, "Awaiting for \'checkfile\'", $sp_lf) if ($cfc == 1);
+    }
+    
+    return(1, "$header\n  ?? Possible Problem" . 
+           ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 0, "Possible Problem", $sp_lf);
+  }
 
   ## To be run ? run it !
   # and now really print the header
