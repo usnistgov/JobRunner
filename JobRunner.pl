@@ -256,7 +256,7 @@ foreach my $wname (@waiton) {
   $wname = &adapt_name($wname);
   &error_quit("\'NameCheck\' jobid is the same as the main jobid [$wname], aborting")
     if ($wname eq $name);
-  my $tmp = "$blockdir/$wname" . $dir_end[0];
+  my $tmp = "$blockdir/$wname${ds_sep}" . $dir_end[0];
   &error_quit("${toprint2}\'NameCheck\' [$wname] not done, exiting")
     if (! JRHelper::does_dir_exists($tmp));
 }
