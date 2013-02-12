@@ -105,7 +105,7 @@ required_options are:
       Go to the specified directory
   --LogFile file
       Override the default location of the log file (inside the run lock directory). Use this option with caution since it will influence the behavior of 'checkfile'
-  --NameCheck jobid [--NameCheck jobid [...]]
+  --WaitForJobName jobid [--WaitForJobName jobid [...]]
       Check that the specified 'jobid' is completed before accepting to run this job. Will check in the same 'lockdir' as the main 'jobid'.
   --checkfile file [--checkfile file [...]]
       check that the required file is present before accepting to run this job. When a successful run is present, check if the file date is newer than the successful run's logfile to decide if a re-run is necessary.

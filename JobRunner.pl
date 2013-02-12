@@ -254,10 +254,10 @@ my ($dsDone, $dsSkip, $dsBad, $dsRun) = @all;
 
 foreach my $wname (@waiton) {
   $wname = &adapt_name($wname);
-  &error_quit("\'NameCheck\' jobid is the same as the main jobid [$wname], aborting")
+  &error_quit("\'WaitForJobName\' jobid is the same as the main jobid [$wname], aborting")
     if ($wname eq $name);
   my $tmp = "$blockdir/$wname${ds_sep}" . $dir_end[0];
-  &error_quit("${toprint2}\'NameCheck\' [$wname] not done, exiting")
+  &error_quit("${toprint2}\'WaitForJobName\' [$wname] not done, exiting")
     if (! JRHelper::does_dir_exists($tmp));
 }
 
@@ -543,7 +543,7 @@ sub _ccr2 {
 
 sub process_options {
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:   CDE G    LMNOP RS  V     bcde ghi  lmnop  stuv      #
+# Used:   CDE G  J LM OP RS  VW    bcde ghi  lmnop  stuv      #
 
   my %opt = ();
 
@@ -577,7 +577,7 @@ sub process_options {
      'mutexTool=s' => sub {$sp_lt = $_[1]; &_ccr2(@_);},
      'MutexLockDir=s' => sub {$sp_ltdir = $_[1]; &_ccr2(@_);},
      'ignoreChildSignal' => sub {$ics = 1; &_cc1(@_);},
-     'NameCheck=s' => sub {push @waiton, $_[1]; &_ccr2(@_);},
+     'WaitForJobName=s' => sub {push @waiton, $_[1]; &_ccr2(@_);},
     ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
   JRHelper::ok_quit("\n$usage\n") if ($opt{'help'});
   JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
@@ -675,8 +675,8 @@ required_options are:
       Go to the specified directory
   --LogFile file
       Override the default location of the log file (inside the run lock directory). Use this option with caution since it will influence the behavior of \'checkfile\'
-  --NameCheck jobid [--NameCheck jobid [...]]
-      Check that the specified \'jobid\' is completed before accepting to run this job. Will check in the same \'lockdir\' as the main \'jobid\'.
+  --WaitForJobName jobid [--WaitForJobName jobid [...]]
+      Check that the specified \'jobid\' name is completed before accepting to run this job. Will check in the same \'lockdir\' as the main \'jobid\'.
   --checkfile file [--checkfile file [...]]
       Check that the required file is present before accepting to run this job. When a successful run is present, check if the file date is newer than the successful run\'s logfile to decide if a re-run is necessary.
   --RunIfTrue executable [--RunIfTrue executable [...]]
