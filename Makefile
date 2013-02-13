@@ -56,6 +56,7 @@ dist_common:
 	@echo `cat ${JOBRUNNER_VERSION}`"-"`date +%Y%m%d-%H%M`.tar.bz2 > /tmp/.JOBRUNNER_distname
 	@echo `pwd` > /tmp/.JOBRUNNER_pwd
 	@(cd /tmp; tar cfj `cat /tmp/.JOBRUNNER_pwd`/`cat /tmp/.JOBRUNNER_distname` --exclude CVS --exclude .DS_Store --exclude "*~" `cat ${JOBRUNNER_VERSION}`)
+	@md5 `cat /tmp/.JOBRUNNER_distname` > `cat /tmp/.JOBRUNNER_distname`.md5	
 	@echo ""
 	@echo ""
 	@echo "** Release ready:" `cat /tmp/.JOBRUNNER_distname`
