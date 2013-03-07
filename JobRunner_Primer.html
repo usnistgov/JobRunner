@@ -4,12 +4,14 @@
 <meta content="text/html; charset=ISO-8859-1" http-equiv="Content-Type">
 <title>JobRunner Primer</title>
 <style type="text/css">
-  body { counter-reset: chapter 0; }
-  h2:before { counter-increment: chapter; content: counter(chapter) ". "; }
-  h2 { counter-reset: section 0; }
-  h3:before { counter-increment: section; content: counter(chapter) "." counter(section) ". "; }
-  h3 { counter-reset: subsection 0; }
-  h4:before { counter-increment: subsection; content: counter(chapter) "." counter(section) "." counter(subsection) ". "; }
+body {counter-reset:section;}
+h1 {counter-reset:subsection;}
+h1:before {counter-increment:section; content: counter(section) ". ";}
+h2 {counter-reset:subsubsection;}
+h2:before {counter-increment:subsection;content:counter(section) "." counter(subsection) ". ";
+}
+h3:before{counter-increment:subsubsection;content:counter(section) "." counter(subsection) "." counter(subsubsection) ". ";
+}
   a {text-decoration:none;}
   pre { border-style: solid; border-width: 1px; margin-left: 5px; padding: 2px 2px 2px 2px; background-color: #DDDDDD; 
 /* from: http://forums.techguy.org/web-design-development/249849-forcing-long-text-lines-wrap.html */
@@ -25,138 +27,47 @@ word-wrap: break-word; /* IE 5.5+ */
 
 <div style="text-align: center;"><big><big><big>JobRunner Primer</big></big></big><br>
 </div>
-<div style="text-align: center;"><small>Last modified: December 31st, 2012</small><br>
+<div style="text-align: center;"><small>Last modified: March 7th, 2013</small><br>
 </div>
  <br>
 
-<h2>Description</h2>
+<!---------------------------------------->
+<h1>Description</h1>
 
-<b>JobRunner</b> is a tool designed to <i>run</i> a <i>job</i>, ie to
-execute a command line or script that does not require user
-interaction, and takes care of storing the
+<a href="#JobRunner"><b>JobRunner</b></a> is a tool designed to <i>run</i> a <i>job</i> (ie to
+execute a command line or script) that does not require user
+interaction, and stores the
 program's output (standard error and standard out) in an easy to read
-log file. The tool is able to save <i>configuration files</i> (or
-"<i>job description</i>") of the <i>job</i> to be run.<br>
+log file. The tool is able to save a <i>configuration file</i> of the
+<i>job</i> to be run, that can be used by <b>JobRunner_Caller</b> as a
+light-weight queueing system.<br>
+In addition to describing the tool's <a
+href="#JR_procorder">Processing order</a>, a few <a
+href="#JR_examples">examples of use</a> are available, as well a <a
+href="#JR_nfs">special note related to use over NFS shared directories</a>.
 <br>
-<b>JobRunner_Caller</b> is a tool designed to <i>call</i>
+<a href="#JobRunner_Caller"><b>JobRunner_Caller</b></a> is a tool designed to <i>call</i>
 <b>JobRunner</b>'s <i>configuration files</i>, acting as a <i>queue
 processor</i>.<br>
+In addition to describing the tool's <a
+href="#JRC_procorder">Processing order</a>, a few <a
+href="#JRC_examples">examples of use</a> are available
 <br>
-The tools were designed to work using directory lock mechanism instead
-of relying on a central networked server to dispatch jobs and aggregate
-log and job status information from networked clients.
+The tools were designed to work using directory lock mechanism, instead
+of relying on a central networked server to dispatch jobs, aggregate
+logs and collect job status information.
 
+<!---------------------------------------->
 <a name="JobRunner">
-<h2>JobRunner</h2>
+<h1>JobRunner</h1>
 </a>
 
-<h3>Command line options</h3>
-
-<pre>
-JobRunner [options] --lockdir ldir --name jobid --executable script
-  or
-JobRunner [options] --lockdir ldir --name jobid -- command_line_to_run
-
-if it can be run, will either run the executable script or the command_line_to_run 
+<a href="JobRunner-usage.html"><b>JobRunner</b>'s command line options</a> can be obtained running:
+<pre>JobRunner --help</pre>
 
 
-
-Where [options] are split in:
-  required_options [common_options] [step1_options] [step2_options] [step3_options]
-
-
-required_options are:
-  --lockdir ldir
-      base lock directory, used to create the actual lock directory (default location of the logfile)
-  --name jobid
-      the unique ID (text value) representing one's job (fixed so that it remove any leading and trailing space, and transforming any characters not a-z, 0-9 or - to _)
-  --executable script
-      executable file to run (only required in non 'command_line_to_run' mode)
-
-
-[common_options] apply to any step, and are:
-  --help
-      This help message. For more help and examples, please look at the Primer that should have been included in the source archive of the tool
-  --version
-      Version information
-  --Verbose
-      Print more verbose status updates
-  --mutexTool tool
-      Specify the full path location of a special locking tool used to create a mutual exclusion to insure JobID exclusive execution (**). Can be specified globaly using the 'JOBRUNNER_MUTEXTOOL' environment variable (command line takes precedence)
-  --MutexLockDir dir
-      Directory in which the 'mutexTool' lock for JobID will be created. Can be specified globaly using the 'JOBRUNNER_MUTEXLOCKDIR' environment variable (command line takes precedence). If none is specified, the main 'lockdir' will be used.
-  --okquit
-      In case the command line to run return a bad status, return the "ok" (exit code 0) status, otherwise return the actual command return code (note that this only applies to the command run, all other issues will return the error exit code)
-  --SuccessReturnCode
-      If the command line to run was run successfully (or previously run successfully), return the user provided error code, any other return code indicates a non successful completion (including skipping job)
-  --ignoreChildSignal
-      Do not exit with error if the job exited on a SIGNAL. The default is to consider any signal an error condition (ex: SIGINT) 
-  --saveConfig file
-      Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using '--useConfig'
-  --useConfig file
-      Use one (and only one) JobRunner configuration files generated by '--saveConfig'. To run on multiple files, use 'JobRunner_Caller'.
-  --toPrint text
-    Change the default output header for JobRunner from:  followed by jobid to user given entry
-
-[step1_options] are any options that take effect before the lock is made, and are (in order of use):
-  --preCreateDir dir [--preCreateDir dir [...]] 
-      Create the specified writable directory if it does not exist. Note that this is done before any checks and as such should be used with caution.
-  --dirChange dir
-      Go to the specified directory
-  --LogFile file
-      Override the default location of the log file (inside the run lock directory). Use this option with caution since it will influence the behavior of 'checkfile'
-  --WaitForJobName jobid [--WaitForJobName jobid [...]]
-      Check that the specified 'jobid' is completed before accepting to run this job. Will check in the same 'lockdir' as the main 'jobid'.
-  --checkfile file [--checkfile file [...]]
-      check that the required file is present before accepting to run this job. When a successful run is present, check if the file date is newer than the successful run's logfile to decide if a re-run is necessary.
-  --RunIfTrue executable [--RunIfTrue executable [...]]
-      Check that given program (no arguments accepted) returns the ok exit status (0) to run job, otherwise do not run job (will still be available for later rerun)
-  --badErase
-      If a bad run is present, erase its run lock directory so it can be retried
-  --Onlycheck
-      Do the entire check list but before doing the actual run, exit with a return code value of "99" (reminder: 1 means that there was an issue, 0 means that the program exited successfully, ie in this case a previous run completed, which can still be a bad run)
-
-
-[step2_options] are any options that take effect after the lock is made but before the job is run, and are (in order of use):
-  --goRunInLock
-      Run in the lock directory
-  --CreateDir dir [--CreateDir dir [...]]
-      Create the specified writable directory if it does not exist.
-  --GoRunInDir
-      Run in the specified directory
-
-
-[step3_options] are any options that take effect after the job is run (in order of use):
-  --PostRunChangeDir dir
-      Change directory to dir
-  --DonePostRun script
-      If the executable or run command exited successfully, run specified script
-  --ErrorPostRun script
-      If the executable or run command did not exit successfully, run specified script
-
-
-**: this is extremely important for queues on network shares (such as NFS), specify the tool that is known to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by JobRunner after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
-</pre>
-
-<code>mutexTool</code> Note: for our use over NFS, we have relied on the
-<code>rlock</code> command (part of the ruby library called <a
-href="https://github.com/ahoward/lockfile">lockfile</a>) using the
-following wrapper (named <code>sp_lock.csh</code>):
-
-<pre>
-#!/bin/csh
-
-set lfile=$1
-shift
-
-# timeout after 60 seconds if not able to obtain the lockfile
-# consider any lock older than 10 days "stale" (in seconds: 3600*24*10=864000) [nil for infinite]
-# when stealing a lock, only wait 10 seconds before confirming
-
-rlock --timeout=60 --max_age 864000 --suspend 10 $lfile
-</pre>
-
-<h3>Simple Job</h3>
+<!---------------------------------------->
+<h2>Simple Job</h2>
 
 In its simplest form, the tool is run either as:
 <pre>
@@ -171,7 +82,10 @@ The first form uses the information on the commandline as the <i>job</i>
 <i>commandline_to_run</i>.
 The second form uses the <i>executable</i> <code>script</code> as the <i>job</i> <i>command</i>.
 
-<h3>Job processing</h3>
+<!---------------------------------------->
+<a name="JR_procorder">
+<h2>Job processing</h2>
+</a>
 
 In order to understand how the tool works, one must understand its use
 of <i>Lock directories</i>.
@@ -277,9 +191,13 @@ When a <b>JobRunner</b> command line is executed:
   </ul>
 </ol>
 
-<h3>A Serie of Examples</h3>
-  
-<h4>"Hello World !" (version 1)</h4>
+<!---------------------------------------->
+<a name="JR_examples">
+<h2>A Series of Examples</h2>
+</a>
+
+<!---------------------------------------->
+<h3>"Hello World !" (version 1)</h3>
 
 After creating our <code>lockdir</code> (<code>JR_lockd</code>):
 <pre>
@@ -334,7 +252,8 @@ we are able to run the same program again, since it is a new
 <code>jobid</code>, and we will now see in the <code>lockdir</code>
 both the <code>test_____done</code> and <code>test2_____done</code> directories.
 
-<h4>"Hello World !" (version 2)</h4>
+<!---------------------------------------->
+<h3>"Hello World !" (version 2)</h3>
 
 After trying to run a command line through <b>JobRunner</b>, let us try
 the <code>executable</code> script version, for that we create a
@@ -393,7 +312,8 @@ location of <i>run lock directory</i> where we expect to find the <code>logfile<
 alone, and use it a <i>run directory</i> where data can be stored
 in to the <i>current directory</i>.
 
-<h4>"Hello World !" (version 3)</h4>
+<!---------------------------------------->
+<h3>"Hello World !" (version 3)</h3>
 
 In this example, we will run the <code>hello_world.bash</code> program
 but only if the required file <code>required_file</code> is
@@ -490,7 +410,8 @@ In this case, the load on my system was low enough that the <i>5 minutes
 load</i> was less than 1.0, therefore the <code>RunIfTrue</code>
 returned <i>ok</i> and therefore the job could be run.
 
-<h4>"Hello World !" (version 4)</h4>
+<!---------------------------------------->
+<h3>"Hello World !" (version 4)</h3>
 
 In this example, we are also making use of the
 <code>DonePostRun</code> and <code>ErrorPostRun</code> options to
@@ -521,7 +442,8 @@ Other examples of uses of those options:
   <li>Append a step result to a global database
 </ul>
 
-<h4>"Hello World !" (version 5)</h4>
+<!---------------------------------------->
+<h3>"Hello World !" (version 5)</h3>
 
 In this example, we will run the same example as in version 4, as <i>jobid</i> <i>test6</i>, but will create a configuration file for running it at a later time:
 
@@ -624,52 +546,43 @@ $VAR1 = [
         ];
 </pre>
 
-
-<a name="JobRunner_Caller">
-<h2>JobRunner_Caller</h2>
+<!---------------------------------------->
+<a name="JR_nfs">
+<h2><code>mutexTool</code> Note</h2>
 </a>
 
-<h3>Command line options</h3>
+For our use over NFS, we have relied on the
+<code>rlock</code> command (part of the ruby library called <a
+href="https://github.com/ahoward/lockfile">lockfile</a>) using the
+following wrapper (named <code>sp_lock.csh</code>):
 
 <pre>
-JobRunner_Caller [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--DirOnceBefore dir [--DirOnceBefore dir [...]]] [--dironce dir [--dironce dir [...]]] [--timeSort mode | --RandomOrder [seed]] [--okquit] [--ExtraLockingTool tool [--LockingToolLockDir dir]] [--QuitFile location] [JobRunner_configfile [JobRunner_configfile [...]]]
+#!/bin/csh
 
-Will execute JobRunner jobs 
+set lfile=$1
+shift
 
-Where:
-  --help       This help message
-  --version    Version information
-  --JobRunner  Location of executable tool (if not in PATH, will also look for it tool dir)
-  --quiet      Do not print stdout/stderr data from system calls
-  --endSetReport  At the end of a set, print a report of job status (bypassing successfully completed jobs) ('level' 1 is to not print 'already in progress' jobs, use a 'level' of 2 to add those, and level '3' to add successfully completed jobs)
-  --SleepInBetweenJobs  Specify the number of seconds to sleep in between two consecutive jobs (example: when a job check the system load before running using JobRunner's '--RunIfTrue', this allow the load to drop some) (default is not to sleep)
-  --watchdir   Directory to look for configuration files [*]
-  --maxSet     Specify the maximum number of set to to in 'watchdir' mode (default is to continue without end)
-  --sleep      Specify the sleep time in between sets (default: 60)
-  --retryall   When running a different set, retry all previously completed entries (especially useful when when a JobRunner configuration uses '--badErase' or '--RunIfTrue')
-  --DirOnceBefore    Directory to look for configuration files only once (before '--watchdir')
-  --dironce    Directory to look for configuration files only once (after '--watchdir')
-  --timeSort   Run jobs in configuration files' Access Time, Creation Time, Modification Time order, instead of the order they are provided. Valid values: atime ctime mtime
-  --RandomOrder  Run jobs in random order instead of the order they are provided (can help with multiple lock dir access over NFS if the data is not propagated from server yet) (note: if providing a random seed --which must be over 0-- use different values for multiple JobRunner_Caller, or simply do not provide any and the current 'time' value will be used)
-  --okquit     The default is to exit with the error status if the "done" vs "todo" count is not the same, this bypass this behavior and exit with the ok status
-  --ExtraLockingTool  Specify the full path location of a special locking tool used to create a mutual exclusion for a JobID execution (**)
-  --LockingToolLockDir  Directory in which the ExtraLockingTool lock for JobID will be created
-  --QuitFile   Location of a file that will be created by the tool and used to let it know to stop processing if the file has disappeared (default is to use a random file location, that will be displayed at the beginning of each set)
+# timeout after 60 seconds if not able to obtain the lockfile
+# consider any lock older than 10 days "stale" (in seconds: 3600*24*10=864000) [nil for infinite]
+# when stealing a lock, only wait 10 seconds before confirming
 
-
-*: in this mode, the program will complete a full run then on the files found in this directory, then sleep '--sleep' seconds before re-reading the directory content and see if any new configuration file is present, before running it. The program will never stop, it is left to the user to stop the program.
-
-**: this is extremely important for queues on network shares (such as NFS), specify the tool that is know to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by JobRunner_Caller after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
-
-
-Job Processing Order: Unless '--RandomOrder' or '--ctimeSort' are used, jobs are processed in the following order: first the '--DirOnceBefore' configuration files, then the '--watchdir' configuration files, followed by the '--dironce' ones, finally the command lines ones. Then, if the tool is in '--watchdir' mode, it will do an infinite number of passes on those files (unless '--maxSet' runs if used)
-
-WARNING: the tool is designed to pass any 'ctrl+C' keyboard input to the 'JobRunner' tool. To end a 'JobRunner_Caller' in '--watchdir' mode (before any '--maxSet' completion if set) it is recommend to use the 'kill' or 'killall' commands, or to 'ctrl+z' and then 'kill' the "suspended" job (or to kill it during its "sleep" times)
+rlock --timeout=60 --max_age 864000 --suspend 10 $lfile
 </pre>
 
-<code>JobRunner_Caller</code>'s purpose is to execute <i>JobRunner</i> on its <i>configuration files</i>. The entire decision on wether a job is to be run is done by <i>JobRunner</i> itself.
+<!---------------------------------------->
+<a name="JobRunner_Caller">
+<h1>JobRunner_Caller</h1>
+</a>
 
-<h3>Processing order</h3>
+<code>JobRunner_Caller</code>'s purpose is to execute <i>JobRunner</i> on its <i>configuration files</i>. The entire decision on wether a job is to be run is done by <i>JobRunner</i> itself.<br>
+<a href="JobRunner_Caller-usage.html"><b>JobRunner_Caller</b>'s command line options</a> can be obtained running:
+<pre>JobRunner_Caller --help</pre>
+
+
+<!---------------------------------------->
+<a name="JRC_procorder">
+<h2>Processing order</h2>
+</a>
 
 <ul>
   <li>Create the <code>quitfile</code>
@@ -693,10 +606,14 @@ WARNING: the tool is designed to pass any 'ctrl+C' keyboard input to the 'JobRun
   </ul>
   <li>If <i>KeepDoingIt</i> is set to <i>true</i>, run the next <i>Set</i>
 </ul>
-    
-<h3>Examples of use</h3>
 
-<h4>Running a set of jobs</h4>
+<!---------------------------------------->
+<a name="JRC_examples">
+<h2>Examples of use</h2>
+</a>
+
+<!---------------------------------------->
+<h3>Running a set of jobs</h3>
 
 In its simplest use, the tool is designed to run <i>JobRunner</i> configuration files. For example, the <code>test6.jobrunner</code>, <code>test8.jobrunner</code> and <code>test9.jobrunner</code> jobs created earlier:
 
@@ -741,7 +658,8 @@ Done (3 / 3)
 
 As can be seen, <code>test6.jobrunner</code> was already run in the past, but <code>test8.jobrunner</code> and <code>test9.jobrunner</code> were not yet, so <i>JobRunner_Caller</i> just insured that those were called in the order they were entered on the command line.
 
-<h4>Queue modes</h4>
+<!---------------------------------------->
+<h3>Queue modes</h3>
 
 When using a <code>watchdir</code> the tool will never exit, unless deletetion of the <code>quitfile</code>; this mode is used to run a <i>queue processor</i>:
 
