@@ -32,12 +32,24 @@ cvsdist:
 	@echo "CVS checkout in: /tmp/"`cat ${JOBRUNNER_VERSION}`
 	@cp ${JOBRUNNER_VERSION} /tmp
 	@(cd /tmp; cvs -z3 -q -d gaston:/home/sware/cvs checkout -d `cat ${JOBRUNNER_VERSION}` JOBRUNNER)
+	@make dist_usage
 	@make dist_common
 	@echo ""
 	@echo ""
 	@echo "***** Did you REMEMBER to update the version number and date in the README file ? *****"
 	@echo "   do a 'make cvs-tag-current-distribution' here "
 
+make_html_usage:
+	@echo "<html><head><title>JobRunner Usage</title><style type=\"text/css\">pre { border-style: solid; border-width: 1px; margin-left: 5px; padding: 2px 2px 2px 2px; background-color: #DDDDDD; white-space: -moz-pre-wrap; white-space: -pre-wrap; white-space: -o-pre-wrap; white-space: pre-wrap; word-wrap: break-word; }</style></head><body><pre>" > JobRunner-usage.html
+	@./JobRunner.pl --help >> JobRunner-usage.html
+	@echo "</pre></body></html>" >> JobRunner-usage.html
+	@echo "<html><head><title>JobRunner_Caller Usage</title><style type=\"text/css\">pre { border-style: solid; border-width: 1px; margin-left: 5px; padding: 2px 2px 2px 2px; background-color: #DDDDDD; white-space: -moz-pre-wrap; white-space: -pre-wrap; white-space: -o-pre-wrap; white-space: pre-wrap; word-wrap: break-word; }</style></head><body><pre>" > JobRunner_Caller-usage.html
+	@./JobRunner_Caller.pl --help >> JobRunner_Caller-usage.html
+	@echo "</pre></body></html>" >> JobRunner_Caller-usage.html
+
+
+dist_usage:
+	@(cd /tmp/`cat ${JOBRUNNER_VERSION}`; make make_html_usage)
 
 dist_head:
 	@echo "***** Checking ${JOBRUNNER_VERSION}"
