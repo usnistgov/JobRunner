@@ -330,7 +330,7 @@ if (JRHelper::does_dir_exists($dsDone)) {
 &check_RunIfTrue();
 
 if ($onlycheck) {
-  &vprint("${toprint2}Would actually have to run tool, exiting with expected return code ($onlycheck_rc)\n");
+  &vprint("${toprint2}Would actually had run tool, exiting with \'OnlyCheck\' expected return code ($onlycheck_rc)\n");
   &ec_ok_quit($onlycheck_rc);
 }
 
@@ -373,11 +373,13 @@ if (! JRHelper::is_blank($grid)) {
   JRHelper::warn_print("${toprint2}GoRunInDir -- Current directory changed to \'$grid\'");
 }
 
+JRHelper::set_showpid(1);
 my ($rv, $tx, $so, $se, $retcode, $flogfile, $signal)
   = JRHelper::write_syscall_logfile
   ($flf, (defined $executable) ? $executable : @ARGV);
 &vprint("${toprint2}-- Final Logfile different from expected one: $flogfile")
   if ($flogfile ne $flf);
+JRHelper::set_showpid(0);
 
 $signal = ($ics == 1) ? 0 : $signal;
 
