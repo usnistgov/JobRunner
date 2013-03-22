@@ -39,6 +39,12 @@ my $versionid = "JRHelper.pm Version: $version";
 
 ########## No 'new' ... only functions to be useful
 
+my $showpid = 0;
+
+sub set_showpid { $showpid = $_[0]; }
+
+##########
+
 sub get_tmpdir {
   my $name = tempdir();
   
@@ -367,7 +373,8 @@ sub _system_call_logfile {
   my $ov = $|;
   $| = 1;
 
-  open (CMD, "$cmdline 1> $stdoutfile 2> $stderrfile |");
+  my $pid = open (CMD, "$cmdline 1> $stdoutfile 2> $stderrfile |");
+  print "** Job running with PID $pid. If you need to stop it please do not Ctrl+C, instead: kill $pid\n" if ($showpid);
   close CMD;
   $retcode = $? >> 8;
   $signal = $? & 127;
