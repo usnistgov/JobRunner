@@ -211,7 +211,8 @@ sub __add2tobedone {
 }
 
 do {
-  print "Reminder: to quit properly after a Job/during a Set, delete the \'QuitFile\': $quitfile\n";
+  my $qtxt = "Reminder: to quit properly after a Job/during a Set, delete the \'QuitFile\': $quitfile";
+  print "$qtxt\n";
 
   my @tobedone = ();
   %alldone = () if ($retryall);
@@ -253,7 +254,10 @@ do {
     $todo{$jrc}++;
 
     my ($ok, $txt, $ds, $msg, $sp_lf) = &doit($jrc);
-    print "$txt\n" if (! JRHelper::is_blank($txt));
+    if (! JRHelper::is_blank($txt)) {
+      print "$txt\n";
+      print "$qtxt\n";
+    }
 
     if ((! JRHelper::is_blank($sp_lf)) && ($ok == -99)) {
       # not able to mutex this jobid, try later
@@ -275,7 +279,9 @@ do {
     if (($ds) && ($sibj)) {
       print " (waiting $sibj seconds)\n";
       sleep($sibj);
+      print "$qtxt\n";
     }
+
   }
   
   $todoc = scalar(keys %todo);
@@ -370,12 +376,12 @@ sub doit {
   my $jb_cmd = "$tool -u $jrc";
 
   my $tjb_cmd = "$jb_cmd -O";
-  my ($rc, $so, $se) = JRHelper::do_system_call($tjb_cmd);
+  my ($rc, $so, $se, $sig) = JRHelper::do_system_call($tjb_cmd);
 
   return(1,
          ($allsetsdone{$jrc} < 2)
          ? ("$header\n  @@ Can be skipped" . ($verb ? "\n(stdout)$so" : ""))
-         : "", 0, &__cleanmsg($so), $sp_lf) if ($rc == 0);
+         : "", 0, &__cleanmsg($so), $sp_lf) if ($rc + $sig == 0);
   
   if ($rc == 1) {
     if (JRHelper::is_blank($se)) { # no warning, check if all "errors" are just "Problem with 'checkfile' [file] : file does not exist"
@@ -399,10 +405,10 @@ sub doit {
   # and now really print the header
   print "$header\n";
 
-  my ($rc, $so, $se) = JRHelper::do_system_call($jb_cmd);
+  my ($rc, $so, $se, $sig) = JRHelper::do_system_call($jb_cmd);
   
   return(1, "  ++ Job completed" . ($verb ? "\n(stdout)$so" : ""), 1, "", $sp_lf)
-    if ($rc == 0);
+    if ($rc + $sig == 0);
   
   return(0, "  ** ERROR Run" . ($verb ? "\n(stdout)$so\n(stderr)$se" : ""), 1, "ERROR RUN", $sp_lf);
 }
