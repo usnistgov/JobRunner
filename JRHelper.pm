@@ -2,7 +2,7 @@ package JRHelper;
 # -*- mode: Perl; tab-width: 2; indent-tabs-mode: nil -*- # For Emacs
 
 # JobRunner's Helper Functions
-#  (small subset of F4DE's common/lib/MMisc.pm)
+#  (small adapted/extended subset of F4DE's common/lib/MMisc.pm)
 #
 # Author(s): Martial Michel
 #
@@ -23,7 +23,7 @@ package JRHelper;
 
 use strict;
 
-use File::Temp qw(tempdir tmpnam);
+use File::Temp qw(tempdir tempfile);
 use Data::Dumper;
 use Cwd qw(cwd abs_path);
 use Time::HiRes qw(gettimeofday tv_interval);
@@ -60,8 +60,9 @@ sub get_tmpdir {
 
 #####
 
+# Request a temporary file (file is created)
 sub get_tmpfilename {
-  my $file = tmpnam();
+  my ($fh, $file) = tempfile();
   return($file);
 }
 
@@ -855,6 +856,13 @@ sub get_scalar_currenttime { return(scalar gettimeofday()); }
 #####
 
 sub get_elapsedtime { return(tv_interval($_[0])); }
+
+#####
+
+sub epoch2str {
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime( $_[0] );
+  return(sprintf("%04d%02d%02d-%02d%02d%02d", $year + 1900, 1 + $mon, $mday, $hour, $min, $sec));
+}
 
 ##########
 
