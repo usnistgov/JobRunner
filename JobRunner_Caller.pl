@@ -93,7 +93,7 @@ my $usage = &set_usage();
 JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 # Av  : ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz  #
-# Used:    DE    J L    QRS          de  h    m o qrst vw     #
+# Used:    DE    J L    QRS         cde  h    m o qrst vw     #
 
 my $toolb = "JobRunner";
 my $tool = JRHelper::cmd_which($toolb);
@@ -114,6 +114,10 @@ my $timesort = "";
 my $sp_lt = "";
 my $sp_ltdir = "";
 my $quitfile = JRHelper::get_tmpfilename();
+unlink($quitfile);
+$quitfile .= ".JobRunner_Caller." . JRHelper::epoch2str(JRHelper::get_scalar_currenttime());
+
+my $csortt = undef;
 
 my %opt = ();
 GetOptions
@@ -137,6 +141,7 @@ GetOptions
    'ExtraLockingTool=s' => \$sp_lt,
    'LockingToolLockDir=s' => \$sp_ltdir,
    'QuitFile=s' => \$quitfile,
+   'customSortTool=s' => \$csortt,
   ) or JRHelper::error_quit("Wrong option(s) on the command line, aborting\n\n$usage\n");
 JRHelper::ok_quit("\n$usage\n\nAutoDection of \'$toolb\' found: $tool\n") if ($opt{'help'});
 JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
@@ -150,11 +155,24 @@ JRHelper::error_quit("Problem with \'$toolb\' tool ($tool): $err")
 JRHelper::error_quit("\SleepInBetweenJobs\' values must be positive ($sibj)")
   if ($sibj < 0);
 
-JRHelper::error_quit("\Random\' and \'timeSort\' can not be used at the same time")
-  if ((defined $random) && (! JRHelper::is_blank($timesort)));
+my $tmpv = (defined $random) ? 1 : 0;
+$tmpv += (! JRHelper::is_blank($timesort)) ? 1 : 0;
+$tmpv += (defined $csortt) ? 1 : 0;
+JRHelper::error_quit("Only one of \'Random\', \'timeSort\' and \'customSortTool\' can not be used at a time")
+  if ($tmpv > 1);
       
 JRHelper::error_quit("Unknow \'timeSort\' value ($timesort), valid options are: $ts_okv_txt")
   if ((! JRHelper::is_blank($timesort)) && (! grep(m%^$timesort$%, @ts_okv)));
+
+my $csortt_if = "";
+my $csortt_of = "";
+if (defined $csortt) {
+  my $err = JRHelper::check_file_x($csortt);
+  JRHelper::error_quit("Problem with \'customSortTool\' tool ($csortt): $err")
+    if (! JRHelper::is_blank($err));
+  $csortt_if = JRHelper::get_tmpfilename();
+  $csortt_of = JRHelper::get_tmpfilename();
+}
 
 if (! JRHelper::is_blank($sp_lt)) {
   my $err = JRHelper::check_file_x($sp_lt);
@@ -228,16 +246,33 @@ do {
     push @tobedone, $file;
   }
 
-  if (defined $random) {
+  # Order @tobedone
+  if (defined $random) { # Random
     @tobedone = sort _rand @tobedone;
   }
-  if (! JRHelper::is_blank($timesort)) {
+  if (! JRHelper::is_blank($timesort)) { # timeSort
     ($err, @tobedone) = JRHelper::sort_files($timesort, @tobedone);
     # we choose to not quit on error messages here, but at least let the user know
     JRHelper::warn_print("While sorting using JobID file's \'$timesort\': $err")
       if (! JRHelper::is_blank($err));
   }
+  if (defined $csortt) { # customSortTool
+    open CSORTT, ">$csortt_if"
+      or JRHelper::error_quit("Problem creating \'customSortTool\' input file ($csortt_if): $!");
+    print CSORTT  join("\n", @tobedone) . "\n";
+    close CSORTT;
+    my $csortt_cmd = "$csortt $csortt_if $csortt_of";
+    my ($rc, $so, $se, $sig) = JRHelper::do_system_call($csortt_cmd);
+    JRHelper::error_quit("Problem running \'customSortTool\': \n(stdout)$so\n(stderr)$se")
+      if ($rc + $sig != 0);
+    open CSORTT, "<$csortt_of"
+      or JRHelper::error_quit("Problem opening \'customSortTool\' output file ($csortt_of): $!");
+    @tobedone = <CSORTT>;
+    close CSORTT;
+    chomp @tobedone;
+  }
 
+  # Process @tobedone
   foreach my $jrc (@tobedone) {
     next if ($kdi == 0);
 
@@ -467,7 +502,7 @@ sub set_usage {
   my $tmp=<<EOF
 $versionid
 
-$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--DirOnceBefore dir [--DirOnceBefore dir [...]]] [--dironce dir [--dironce dir [...]]] [--timeSort mode | --RandomOrder [seed]] [--okquit] [--ExtraLockingTool tool [--LockingToolLockDir dir]] [--QuitFile location] [JobRunner_configfile [JobRunner_configfile [...]]]
+$0 [--help | --version] [--JobRunner executable] [--quiet] [--endSetReport level] [--SleepInBetweenJobs seconds] [--watchdir dir [--watchdir dir [...]] [--maxSet number] [--sleep seconds] [--retryall]] [--DirOnceBefore dir [--DirOnceBefore dir [...]]] [--dironce dir [--dironce dir [...]]] [--timeSort mode | --RandomOrder [seed] | --customSortTool tool] [--okquit] [--ExtraLockingTool tool [--LockingToolLockDir dir]] [--QuitFile location] [JobRunner_configfile [JobRunner_configfile [...]]]
 
 Will execute JobRunner jobs 
 
@@ -486,6 +521,7 @@ Where:
   --dironce    Directory to look for configuration files only once (after \'--watchdir\')
   --timeSort   Run jobs in configuration files\' Access Time, Creation Time, Modification Time order, instead of the order they are provided. Valid values: $ts_okv_txt
   --RandomOrder  Run jobs in random order instead of the order they are provided (can help with multiple lock dir access over NFS if the data is not propagated from server yet) (note: if providing a random seed --which must be over 0-- use different values for multiple JobRunner_Caller, or simply do not provide any and the current \'time\' value will be used)
+  --customSortTool   Run the provided \'tool\' with two arguments: 1) a file containing the list of all the Jobs files to be run (full path, one per line) 2) the name of a file expected to contain the sorted list (same entry than in the input file, full path, one entry per line), sorted with the job to be run first at the top of the list, and last at the bottom of the list
   --okquit     The default is to exit with the error status if the \"done\" vs \"todo\" count is not the same, this bypass this behavior and exit with the ok status
   --ExtraLockingTool  Specify the full path location of a special locking tool used to create a mutual exclusion for a JobID execution (**)
   --LockingToolLockDir  Directory in which the ExtraLockingTool lock for JobID will be created
@@ -497,7 +533,7 @@ Where:
 **: this is extremely important for queues on network shares (such as NFS), specify the tool that is know to create a safe exclusive access lock file on such a network share. The tool (or wrapper script) must: 1) take only one argument, the lock file location. 2) create the lock file but not erase it (this is done by $0 after job completion). 3) return the 0 exit status if the lock was obtained, any other status otherwise.
 
 
-Job Processing Order: Unless \'--RandomOrder\' or \'--ctimeSort\' are used, jobs are processed in the following order: first the \'--DirOnceBefore\' configuration files, then the \'--watchdir\' configuration files, followed by the \'--dironce\' ones, finally the command lines ones. Then, if the tool is in \'--watchdir\' mode, it will do an infinite number of passes on those files (unless \'--maxSet\' runs if used)
+Job Processing Order: Unless \'--RandomOrder\', \'--timeSort\' or \'--customSortTool\' are used, jobs are processed in the following order: first the \'--DirOnceBefore\' configuration files, then the \'--watchdir\' configuration files, followed by the \'--dironce\' ones, finally the command lines ones. Then, if the tool is in \'--watchdir\' mode, it will do an infinite number of passes on those files (unless \'--maxSet\' runs if used)
 
 WARNING: the tool is designed to pass any 'ctrl+C' keyboard input to the \'JobRunner\' tool. To end a \'JobRunner_Caller\' in \'--watchdir\' mode (before any \'--maxSet\' completion if set) it is recommend to use the \'kill\' or \'killall\' commands, or to \'ctrl+z\' and then \'kill\' the \"suspended\" job (or to kill it during its \"sleep\" times)
 
