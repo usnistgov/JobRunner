@@ -546,28 +546,8 @@ $VAR1 = [
         ];
 </pre>
 
-<!---------------------------------------->
-<a name="JR_nfs">
-<h2><code>mutexTool</code> Note</h2>
-</a>
 
-For our use over NFS, we have relied on the
-<code>rlock</code> command (part of the ruby library called <a
-href="https://github.com/ahoward/lockfile">lockfile</a>) using the
-following wrapper (named <code>sp_lock.csh</code>):
 
-<pre>
-#!/bin/csh
-
-set lfile=$1
-shift
-
-# timeout after 60 seconds if not able to obtain the lockfile
-# consider any lock older than 10 days "stale" (in seconds: 3600*24*10=864000) [nil for infinite]
-# when stealing a lock, only wait 10 seconds before confirming
-
-rlock --timeout=60 --max_age 864000 --suspend 10 $lfile
-</pre>
 
 <!---------------------------------------->
 <a name="JobRunner_Caller">
@@ -596,7 +576,7 @@ rlock --timeout=60 --max_age 864000 --suspend 10 $lfile
       <li>Entries found in the <code>dironce</code> directory (only first <i>set</i>)
       <li>Command line provided <i>JobRunner configuration files</i> 
     </ol>
-    <li>If <code>RandomOrder</code> or <code>timeSort</code> is used, apply it to the <i>ToBeDone</i> list
+    <li>If one of <code>RandomOrder</code>, <code>timeSort</code> or <code>customSortTool</code> is used, apply it to the <i>ToBeDone</i> list
     <li>For each <i>Job</i> in <i>ToBeDone</i>:
     <ul>
       <li>Check if the <code>QuitFile</code> still exists; if it does not, set <i>KeepDoingIt</i> to <i>false</i> and exit loop
@@ -619,13 +599,14 @@ In its simplest use, the tool is designed to run <i>JobRunner</i> configuration 
 
 <pre>
 % JobRunner_Caller test6.jobrunner test8.jobrunner test9.jobrunner
-Reminder: to quit properly after a Job/during a Set, delete the 'QuitFile': <i>/tmpdir</i>/Gv6LCnydsw
+Reminder: to quit properly after a Job/during a Set, delete the 'QuitFile': <i>/tmpdir</i>/<i>tmpfile</i>
 
 
 [**] Job Runner Config: '/Users/martial/Works/JobRunner/test6.jobrunner'
   @@ Can be skipped
 (stdout)[Warning] [JobRunner] test6 : dirChange -- Current directory changed to '/tmp'
 [JobRunner] test6 : Previously successfully completed, and no file listed in 'checkfile' is newer than the logfile, not re-runing
+Reminder: to quit properly after a Job/during a Set, delete the 'QuitFile': <i>/tmpdir</i>/<i>tmpfile</i>
 
 
 [**] Job Runner Config: './test8.jobrunner'
@@ -638,6 +619,7 @@ Reminder: to quit properly after a Job/during a Set, delete the 'QuitFile': <i>/
 [JobRunner] test8 : %% OK Post Running: 'touch /tmp/test6_doneok'
 
 [JobRunner] test8 : Job successfully completed
+Reminder: to quit properly after a Job/during a Set, delete the 'QuitFile': <i>/tmpdir</i>/<i>tmpfile</i>
 
 
 [**] Job Runner Config: './test9.jobrunner'
@@ -650,6 +632,7 @@ Reminder: to quit properly after a Job/during a Set, delete the 'QuitFile': <i>/
 [JobRunner] test9 : %% OK Post Running: 'touch /tmp/test6_doneok'
 
 [JobRunner] test9 : Job successfully completed
+Reminder: to quit properly after a Job/during a Set, delete the 'QuitFile': <i>/tmpdir</i>/<i>tmpfile</i>
 
 
 %%%%%%%%%% Set 1 run results: 3 / 3 %%%%%%%%%%
@@ -689,11 +672,61 @@ linux1:shell1 % JobRunner_Caller --watchdir anyOSjobs_dir --watchdir linuxOnly_d
 
 osx1:shell1 % JobRunner_Caller --watchdir anyOSjobs_dir --watchdir OSXOnly_dir
 </pre>
-The <i>linux1</i> system will try to process jobs that are both in <code>anyOSjobs_dir</code> and <code>linuxOnly_dir</code>, while the <i>osx1</i>  system will try to process jobs that are both in <code>anyOSjobs_dir</code> and <code>OSXOnly_dir</code>. So if a <i>jobid</i> <code>complexJob99.jobrunner</i> is present both in <code>linuxOnly_dir</code> and <code>OSXOnly_dir</code> in its <i>linux</i> and <i>OSX</i> executable equivalents, the first system to be available will complete that <i>job</i> and the other system will see that the <i>jobid</i> is used in <i>JobRunner</i>'s <code>lockdir</code> already, and will skip it from being reprocessed.
+The <i>linux1</i> system will try to process jobs that are both in <code>anyOSjobs_dir</code> and <code>linuxOnly_dir</code>, while the <i>osx1</i>  system will try to process jobs that are both in <code>anyOSjobs_dir</code> and <code>OSXOnly_dir</code>. So if a <i>jobid</i> <code>complexJob99.jobrunner</code> is present both in <code>linuxOnly_dir</code> and <code>OSXOnly_dir</code> in its <i>linux</i> and <i>OSX</i> executable equivalents, the first system to be available will complete that <i>job</i> and the other system will see that the <i>jobid</i> is used in <i>JobRunner</i>'s <code>lockdir</code> already, and will skip it from being reprocessed.
 In this example, a <code>anyOSjobs_dir</code> is also used to contain any <i>job</i> that can be run on either operating system.
 
 <!-- check in /slp/SLRE/jobrunner/mx5/mic-interview/ there are a lot -->
 <!-- of examples in there (and in /slp/SLRE2/jobrunner) -->
+
+<!---------------------------------------->
+<a name="JR_nfs">
+<h1><code>JobRunner</code>'s <code>mutexTool</code> and
+<code>JobRunner_Caller</code>'s <code>ExtraLockingTool</code></h1>
+</a>
+
+<h2>Method 1: Login access to NFS server</h2>
+
+For use over NFS, If you have login access to the NFS server computer,
+one way of insuring an atomic lock creation is to use the unix
+<code>lockfile</code> command.
+
+The following example script also rely on having an <code>ssh-agent</code>
+running to log into the <i>nfs_server_host</i> computer:
+
+<pre>
+#!/bin/csh
+
+set lfile=$1
+shift
+
+# Only try once to obtain lock (expected 8 seconds)
+# the idea is that lock creation is atomic on the server which host the file
+
+ssh <i>nsf_server_host</i> lockfile -r 1 $lfile
+</pre>
+
+<h2>Method 2: Other cases</h2>
+
+For our use over NFS, if you do not have login access to the NFS
+server computer, we have relied on the <code>rlock</code> command
+(part of the ruby library called <a
+ href="https://github.com/ahoward/lockfile">lockfile</a>) using the
+following wrapper (named <code>sp_lock.csh</code>):
+
+<pre>
+#!/bin/csh
+
+set lfile=$1
+shift
+
+# timeout after 60 seconds if not able to obtain the lockfile
+# consider any lock older than 10 days "stale" (in seconds: 3600*24*10=864000) [nil for infinite]
+# when stealing a lock, only wait 10 seconds before confirming
+
+rlock --timeout=60 --max_age 864000 --suspend 10 $lfile
+</pre>
+
+
 
 </body>
 </html>
