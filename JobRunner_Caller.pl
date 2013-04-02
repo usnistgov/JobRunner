@@ -313,8 +313,8 @@ do {
 
     if (($ds) && ($sibj)) {
       print " (waiting $sibj seconds)\n";
-      sleep($sibj);
       print "$qtxt\n";
+      sleep($sibj);
     }
 
   }
