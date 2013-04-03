@@ -26,7 +26,7 @@ use strict;
 use File::Temp qw(tempdir tempfile);
 use Data::Dumper;
 use Cwd qw(cwd abs_path);
-use Time::HiRes qw(gettimeofday tv_interval);
+use Time::HiRes qw(gettimeofday tv_interval usleep);
 
 my $version     = '0.1b';
 
@@ -39,9 +39,18 @@ my $versionid = "JRHelper.pm Version: $version";
 
 ########## No 'new' ... only functions to be useful
 
-my $showpid = 0;
+my $showpid = undef;
 
+# If value is "" simply show to stdout, otherwise consider it a filename
 sub set_showpid { $showpid = $_[0]; }
+
+##
+my $showpid_pre_text = "";
+sub set_showpid_pre_text { $showpid_pre_text = $_[0]; }
+
+#####
+my $showpid_load_file = undef;
+sub set_showpid_load_file { $showpid_load_file = $_[0]; }
 
 ##########
 
@@ -86,7 +95,7 @@ sub slurp_file {
     my @all = <FILE>;
     chomp @all;
 
-    $out = fast_join("\n", \@all);
+    $out = &fast_join("\n", \@all);
   }
   close FILE;
 
@@ -375,7 +384,27 @@ sub _system_call_logfile {
   $| = 1;
 
   my $pid = open (CMD, "$cmdline 1> $stdoutfile 2> $stderrfile |");
-  print "** Job running with PID $pid. If you need to stop it please do not Ctrl+C, instead: kill $pid\n" if ($showpid);
+  if (defined $showpid) {
+    if ($showpid eq "") {
+      print "${showpid_pre_text}** Job running with PID $pid. If you need to stop it please do not use Ctrl+C, instead: \% kill $pid\n";
+    } else {
+      &writeTo($showpid, "", 0, 0, $pid);
+    }
+  }
+  if (defined $showpid_load_file) {
+    my $kdi = 10; # we wait a max of 2s second before failing
+    while ($kdi > 0) {
+      my $fpid = &slurp_file($showpid_load_file);
+      if (is_blank($fpid)) {
+        usleep(200000);
+        $kdi--;
+      } else {
+        print "${showpid_pre_text}** FYI: Job running with PID $fpid. If you need to stop it please do not use Ctrl+C, instead: \% kill $fpid\n";
+        $kdi = -99;
+      }
+    }
+    print "${showpid_pre_text}** Was unable to obtain the \'saved-to-file\' PID. If you need to stop it please do not use Ctrl+C, instead try: \% kill $pid\n" if ($kdi != -99);
+  }
   close CMD;
   $retcode = $? >> 8;
   $signal = $? & 127;
@@ -390,7 +419,7 @@ sub _system_call_logfile {
   unlink($stdoutfile);
   unlink($stderrfile);
 
-  return($retcode, $stdout, $stderr, $signal);
+  return($retcode, $stdout, $stderr, $signal, $pid);
 }
 
 #####
@@ -407,11 +436,12 @@ sub write_syscall_logfile {
   return(0, '', '', '', '') 
     if ( (&is_blank($ofile)) || (scalar @_ == 0) );
 
-  my ($retcode, $stdout, $stderr, $signal) = &_system_call_logfile($ofile, @_);
+  my ($retcode, $stdout, $stderr, $signal, $pid) = &_system_call_logfile($ofile, @_);
 
   my $otxt = '[[COMMANDLINE]] ' . join(' ', @_) . "\n"
     . "[[RETURN CODE]] $retcode\n"
     . "[[SIGNAL]] $signal\n"
+#    . "[[PID]] $pid\n"
     . "[[STDOUT]]\n$stdout\n\n"
     . "[[STDERR]]\n$stderr\n";
 
