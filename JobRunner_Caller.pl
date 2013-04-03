@@ -229,7 +229,7 @@ sub __add2tobedone {
 }
 
 do {
-  my $qtxt = "Reminder: to quit properly after a Job/during a Set, delete the \'QuitFile\': $quitfile";
+  my $qtxt = "\% Reminder: to quit properly after a Job/during a Set, delete the \'QuitFile\': $quitfile";
   print "$qtxt\n";
 
   my @tobedone = ();
@@ -291,7 +291,7 @@ do {
     my ($ok, $txt, $ds, $msg, $sp_lf) = &doit($jrc);
     if (! JRHelper::is_blank($txt)) {
       print "$txt\n";
-      print "$qtxt\n";
+      print "$qtxt\n" if (! JRHelper::is_blank($qtxt));
     }
 
     if ((! JRHelper::is_blank($sp_lf)) && ($ok == -99)) {
@@ -312,8 +312,8 @@ do {
     $notdone{$jrc} = $msg if (! JRHelper::is_blank($msg));
 
     if (($ds) && ($sibj)) {
+#      print "$qtxt\n" if (! JRHelper::is_blank($qtxt));
       print " (waiting $sibj seconds)\n";
-      print "$qtxt\n";
       sleep($sibj);
     }
 
@@ -335,6 +335,7 @@ do {
   $kdi = 0 if ($maxSet == 0);
 
   if ($kdi) {
+    print "$qtxt\n" if (! JRHelper::is_blank($qtxt));
     print " (waiting $sleepv seconds)\n";
     sleep($sleepv);
   }
@@ -440,8 +441,12 @@ sub doit {
   # and now really print the header
   print "$header\n";
 
+  my $showpid_tf = JRHelper::get_tmpfilename();
+  JRHelper::set_showpid_load_file($showpid_tf);
+  $jb_cmd .= " --writePID $showpid_tf";
   my ($rc, $so, $se, $sig) = JRHelper::do_system_call($jb_cmd);
-  
+  JRHelper::set_showpid_load_file(undef);
+
   return(1, "  ++ Job completed" . ($verb ? "\n(stdout)$so" : ""), 1, "", $sp_lf)
     if ($rc + $sig == 0);
   
