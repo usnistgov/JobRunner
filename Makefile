@@ -36,7 +36,7 @@ cvsdist:
 	@make dist_common
 	@echo ""
 	@echo ""
-	@echo "***** Did you REMEMBER to update the version number and date in the README file ? *****"
+	@echo "***** Did you REMEMBER to update the version number and date in the README file as well as extend the ReleaseNotes.txt ? *****"
 	@echo "   do a 'make cvs-tag-current-distribution' here "
 
 make_html_usage:
