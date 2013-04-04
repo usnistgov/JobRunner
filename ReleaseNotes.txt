@@ -1,0 +1,41 @@
+Version 1.3.0 (Apr 4, 2013):
++ JobRunner.pl: Added 'writePID' command line option
++ JobRunner_Caller.pl: Added 'customSortTool' command line option
+* JobRunner_Caller.pl: Added printout of JobRunner's Job PID when run (if obtainable)
+* JobRunner_Caller.pl: changed default naming of "QuitFile" file (if none given) and frequency of reminder
++ Added 'ReleaseNotes.txt'
+* JobRunner_Primer.html: updated for new options & detailled two methods for NFS problem
+
+
+Version 1.2.1 (Mar 7, 2013):
+* JobRunner_Primer.html: Reorganize & content shift, as well as link to usage page
++ release archive: added MD5 digest of file to name
+
+Version 1.2 (Feb 13, 2013):
++ JobRunner_Caller.pl: Added 'ignoreChildSignal', 'WaitForJobName' command line options
+* JobRunner.pl: 'useConfig' processing is done first so that command line override is possible
+* JobRunner.pl: Insured options loaded from config file are rewritten as replacement of previous options, not duplicate of the same option and fix loading configuration files so that '--' entries are added post @ARGV
+* JobRunner.pl: Allow 'MutexLockDir' to be same a 'lockdir' (uses it if not specified)
++ JobRunner_Caller.pl: Added 'DirOnceBefore' command line option
+* JobRunner_Caller.pl: Cleaner message when "Awaiting for checkfile"
+* JobRunner_Primer.html: Updated for latest version of JobRunner and added additional examples
+* JobRunner_Primer.html: Completed 'JobRunner_Caller' section
++ JRHelper.pm: Added signal extraction from process call
+
+
+Version 1.1 (Nov 19, 2012):
+* Moved from F4DE to be its own tool
++ Added JobRunner_Primer.html
++ Added JRHelper.pm component
++ Added release tool and README
++ JobRunner.pl: Added DonePostRun, ErrorPostRun, goRunInLock, PostRunChangeDir, GoRunInDir, toPrint, SuccessReturnCode, mutexTool, MutexLockDir command line options
++ JobRunner.pl: Enable JOBRUNNER_MUTEXTOOL and JOBRUNNER_MUTEXLOCKDIR environment variables
++ JobRunner_Caller.pl: Added dironce, endSetReport, okquit, maxSet, timeSort, ExtraLockingTool, LockingToolLockDir, QuitFile command line options
+
+
+Version 1.0 (Oct 29, 2010):
+* Moved from TRECVid internals to F4DE as an independent tool
+
+
+Version 0.1 (2008):
++ Added core functionalities to TRECVid SED 08 internal scoring pipeline
