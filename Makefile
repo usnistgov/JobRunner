@@ -65,7 +65,7 @@ dist_common:
 	@make dist_archive_pre_remove
 	@echo ""
 	@echo "Building the tar.bz2 file"
-	@echo `cat ${JOBRUNNER_VERSION}`"-"`date +%Y%m%d-%H%M`.tar.bz2 > /tmp/.JOBRUNNER_distname
+	@echo `cat ${JOBRUNNER_VERSION}`"-"`date -u +%Y%m%d-%H%M`"Z.tar.bz2" > /tmp/.JOBRUNNER_distname
 	@echo `pwd` > /tmp/.JOBRUNNER_pwd
 	@(cd /tmp; tar cfj `cat /tmp/.JOBRUNNER_pwd`/`cat /tmp/.JOBRUNNER_distname` --exclude CVS --exclude .DS_Store --exclude "*~" `cat ${JOBRUNNER_VERSION}`)
 	@md5 `cat /tmp/.JOBRUNNER_distname` > `cat /tmp/.JOBRUNNER_distname`.md5	
