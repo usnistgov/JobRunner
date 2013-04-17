@@ -488,9 +488,9 @@ sub ok_quit {
 ##
 
 sub ec_ok_quit {
-  my $ec = JRHelper::iuv($_[0], 0);
+  my $ec = shift @_;
   &__common_quit((scalar @_ > 0) ? join(' ', @_) . "\n" : "");
-  exit($ec) if ($ec != 0);
+  exit($ec) if ((defined $ec) && ($ec != 0));
   JRHelper::ok_exit();
 }
 
