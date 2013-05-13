@@ -147,7 +147,7 @@ JRHelper::ok_quit("\n$usage\n\nAutoDection of \'$toolb\' found: $tool\n") if ($o
 JRHelper::ok_quit("$versionid\n") if ($opt{'version'});
 
 JRHelper::error_quit("Problem with \'$toolb\' tool ($tool): not found")
-  if ((! defined $tool) || (! JRHelper::does_file_exists($tool)));
+  if ((! defined $tool) || (! JRHelper::does_file_exist($tool)));
 my $err = JRHelper::check_file_x($tool);
 JRHelper::error_quit("Problem with \'$toolb\' tool ($tool): $err")
   if (! JRHelper::is_blank($err));
@@ -229,7 +229,7 @@ sub __add2tobedone {
 }
 
 do {{ # transform 'do' in a valid loop, see: http://perldoc.perl.org/perlsyn.html#Loop-Control
-  if (! JRHelper::does_file_exists($quitfile)) {
+  if (! JRHelper::does_file_exist($quitfile)) {
     $kdi = 0;
     next;
   }
@@ -283,7 +283,7 @@ do {{ # transform 'do' in a valid loop, see: http://perldoc.perl.org/perlsyn.htm
     my $jrc = $tobedone[$jrc_i];
 
     # Check+recreate(touch) QuitFile
-    if (! JRHelper::does_file_exists($quitfile)) {
+    if (! JRHelper::does_file_exist($quitfile)) {
       $kdi = 0;
       next;
     }
