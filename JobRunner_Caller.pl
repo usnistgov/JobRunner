@@ -228,7 +228,12 @@ sub __add2tobedone {
   }
 }
 
-do {
+do {{ # transform 'do' in a valid loop, see: http://perldoc.perl.org/perlsyn.html#Loop-Control
+  if (! JRHelper::does_file_exists($quitfile)) {
+    $kdi = 0;
+    next;
+  }
+
   my $qtxt = "\% Reminder: to quit properly after a Job/during a Set, delete the \'QuitFile\': $quitfile";
   print "$qtxt\n";
 
@@ -273,8 +278,9 @@ do {
   }
 
   # Process @tobedone
-  foreach my $jrc (@tobedone) {
-    next if ($kdi == 0);
+  my $jrc_max = scalar @tobedone;
+  for (my $jrc_i = 0; $jrc_i < $jrc_max && $kdi == 1; $jrc_i++) {
+    my $jrc = $tobedone[$jrc_i];
 
     # Check+recreate(touch) QuitFile
     if (! JRHelper::does_file_exists($quitfile)) {
@@ -288,7 +294,7 @@ do {
 
     $todo{$jrc}++;
 
-    my ($ok, $txt, $ds, $msg, $sp_lf) = &doit($jrc);
+    my ($ok, $txt, $ds, $msg, $sp_lf) = &doit($jrc, $jrc_i, $jrc_max);
     if (! JRHelper::is_blank($txt)) {
       print "$txt\n";
       print "$qtxt\n" if (! JRHelper::is_blank($qtxt));
@@ -340,7 +346,7 @@ do {
     sleep($sleepv);
   }
 
-} while ($kdi);
+}} while ($kdi);
 
 print "Done ($donec / $todoc)\n";
 
@@ -374,7 +380,7 @@ sub __cleanmsg {
 ##
 
 sub doit {
-  my ($jrc) = @_;
+  my ($jrc, $jrc_i, $jrc_max) = @_;
 
   my $sp_lf = "";
   if (! JRHelper::is_blank($sp_lt)) {
@@ -395,10 +401,10 @@ sub doit {
   $allsetsdone{$jrc}++; # if > 1 it means we have already done it in the past
   # and therefore do not print "skip" info anymore
 
-  my $header = "\n\n[**] Job Runner Config: \'$jrc\'";
+  my $header = "\n\n[**] (" . 1+$jrc_i . "/$jrc_max) Job Runner Config: \'$jrc\'";
 
   my $err = JRHelper::check_file_r($jrc);
-  return(0, 
+  return(0,
          (($allsetsdone{$jrc} < 2) 
          ? "$header\n  !! Skipping -- Problem with file ($jrc): $err"
          : ""), 0, "File Issue: $err", $sp_lf) if (! JRHelper::is_blank($err));
