@@ -89,6 +89,7 @@ my $toprintd = "[JobRunner]";
 my $onlycheck_rc = 99;
 my $jr_mutext_env = 'JOBRUNNER_MUTEXTOOL';
 my $jr_mutexd_env = 'JOBRUNNER_MUTEXLOCKDIR';
+my $auto_name = "__auto__";
 my $usage = &set_usage();
 JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
@@ -97,7 +98,7 @@ JRHelper::ok_quit("\n$usage\n") if (scalar @ARGV == 0);
 
 my $blockdir = "";
 my @checkfiles = ();
-my $tname = "";
+my $name = "";
 my $verb = 0;
 my $redobad = 0;
 my $okquit = 0;
@@ -125,7 +126,9 @@ my $showpid = undef;
 
 my @cc = ();
 my %ccx = ();
-# Sort the options, so that 'useConfig' is first to load the file before the command line override 
+# Sort the options, so that 'useConfig' is first to load the file before the command line override
+my $pwd = JRHelper::get_pwd();
+ 
 @ARGV = &__sort_options();
 &process_options();
 
@@ -133,12 +136,18 @@ my %ccx = ();
 JRHelper::error_quit("\'executable\' and command line can not be used at the same time")
   if ((defined $executable) && (scalar @ARGV > 0));
 
-my $name = &adapt_name($tname);
-JRHelper::error_quit("No \'name\' specified, aborting")
-  if (JRHelper::is_blank($name));
-
 JRHelper::error_quit("\'0\' or \'1\' are invalid \"SuccessReturnCode\" values, as they are reserved for normal operations")
   if ((defined $successreturn) && (($successreturn == 0) || ($successreturn == 1)));
+
+&error_quit("No \'lockdir\' specified, aborting")
+  if (JRHelper::is_blank($blockdir));
+
+my $err = JRHelper::check_dir_w($blockdir);
+&error_quit("Problem with \'lockdir\' : $err")
+  if (! JRHelper::is_blank($err));
+
+JRHelper::error_quit("No \'name\' specified, aborting")
+  if (JRHelper::is_blank($name));
 
 $sp_ltdir = $blockdir
   if ((! JRHelper::is_blank($sp_lt)) && (JRHelper::is_blank($sp_ltdir)));
@@ -146,6 +155,10 @@ $sp_ltdir = $blockdir
 #####
 # write configuration file
 if (! JRHelper::is_blank($outconf)) {
+  if (JRHelper::does_dir_exist($outconf)) {
+    $outconf =~ s%\/$%%; # remove trailing /
+    $outconf = "$outconf/$name";
+  }
   if (scalar @ARGV > 0) {
     push @cc, '--', @ARGV;
   }
@@ -203,7 +216,6 @@ foreach my $ddir (@predir) {
     if (! JRHelper::make_wdir($ddir));
 }
 
-my $pwd = JRHelper::get_pwd();
 if (! JRHelper::is_blank($dirchange)) {
   my $err = JRHelper::check_dir_r($dirchange);
   &error_quit("${toprint2}Problem with \'dirChange\' directory ($dirchange): $err")
@@ -229,18 +241,9 @@ foreach my $rit (@runiftrue) {
     if (! JRHelper::is_blank($err));
 }
 
-$blockdir =~ s%\/$%%; # remove trailing /
-$blockdir = JRHelper::get_file_full_path($blockdir, $pwd);
-&error_quit("${toprint2}No \'lockdir\' specified, aborting")
-  if (JRHelper::is_blank($blockdir));
-
-my $err = JRHelper::check_dir_w($blockdir);
-&error_quit("${toprint2}Problem with \'lockdir\' : $err")
-  if (! JRHelper::is_blank($err));
-
 my $lockdir = "$blockdir/$name";
 &error_quit("${toprint2}The lockdir directory ($lockdir) must not exist to use this tool")
-  if (JRHelper::does_dir_exists($lockdir));
+  if (JRHelper::does_dir_exist($lockdir));
 
 my @dir_end = ("done", "skip", "bad", "inprogress");
 my $ds_sep  = "_____";
@@ -259,7 +262,7 @@ foreach my $wname (@waiton) {
     if ($wname eq $name);
   my $tmp = "$blockdir/$wname${ds_sep}" . $dir_end[0];
   &error_quit("${toprint2}\'WaitForJobName\' [$wname] not done, exiting")
-    if (! JRHelper::does_dir_exists($tmp));
+    if (! JRHelper::does_dir_exist($tmp));
 }
 
 foreach my $file (@checkfiles) {
@@ -271,7 +274,7 @@ foreach my $file (@checkfiles) {
 my @mulcheck = ();
 foreach my $tmpld (@all) {
   push(@mulcheck, $tmpld)
-    if (JRHelper::does_dir_exists($tmpld));
+    if (JRHelper::does_dir_exist($tmpld));
 }
 &error_quit("${toprint2}Can not run program, lockdir already exists in multiple states:\n - " . join("\n - ", @mulcheck))
   if (scalar @mulcheck > 1);
@@ -281,12 +284,12 @@ foreach my $tmpld (@all) {
 ##########
 ## Skip ?
 &ok_quit("${toprint2}Skip requested")
-  if (JRHelper::does_dir_exists($dsSkip));
+  if (JRHelper::does_dir_exist($dsSkip));
 
 my $blogfile = "logfile";
 ##########
 ## Previously bad ?
-if (JRHelper::does_dir_exists($dsBad)) {
+if (JRHelper::does_dir_exist($dsBad)) {
   &ok_quit("${toprint2}Previous bad run present, skipping")
     if (! $redobad);
 
@@ -294,16 +297,16 @@ if (JRHelper::does_dir_exists($dsBad)) {
   
   `rm -rf $dsBad`;
   &error_quit("${toprint2}Problem deleting \'bad\' lockdir [$dsBad], still present ?")
-    if (JRHelper::does_dir_exists($dsBad));
+    if (JRHelper::does_dir_exist($dsBad));
 }
 
 
 ##########
 ## Previously done ?
-if (JRHelper::does_dir_exists($dsDone)) {
+if (JRHelper::does_dir_exist($dsDone)) {
   my $flf = (JRHelper::is_blank($rlogfile)) ? "$dsDone/$blogfile" : $rlogfile;
   
-  if (JRHelper::does_file_exists($flf)) {
+  if (JRHelper::does_file_exist($flf)) {
     if (JRHelper::newest($flf, @checkfiles) eq $flf) { 
       my $msg = "${toprint2}Previously successfully completed";
       &ec_ok_quit($successreturn, $msg) if (defined $successreturn);
@@ -317,14 +320,14 @@ if (JRHelper::does_dir_exists($dsDone)) {
   &vprint("${toprint2}!! Deleting previous run lockdir [$dsDone]");
   `rm -rf $dsDone`;
   &error_quit("${toprint2}Problem deleting lockdir [$dsDone], still present ?")
-    if (JRHelper::does_dir_exists($dsDone));
+    if (JRHelper::does_dir_exist($dsDone));
 }
 
 
 ##########
 ## Already in progress ?
 &ok_quit("${toprint2}Job already in progress, Skipping")
-  if (JRHelper::does_dir_exists($dsRun));
+  if (JRHelper::does_dir_exist($dsRun));
 
 ##########
 # Actual run
@@ -431,8 +434,20 @@ sub _postrunning_status {
 
 #####
 
+sub get_full_path {
+  my $tmp = $_[0];
+  $tmp =~ s%\/$%%; # remove trailing /
+  $tmp = JRHelper::get_file_full_path($tmp, $pwd);
+  return($tmp);
+}
+
+#####
+
 sub adapt_name {
   my $tmp = $_[0];
+  if ($tmp eq $auto_name) { 
+    $tmp = join("___", JRHelper::epoch2str(JRHelper::get_scalar_currenttime()), $$, int(rand(1000000))); 
+  }
   $tmp =~ s%^\s+%%;
   $tmp =~ s%\s+$%%;
   $tmp =~ s%[^a-z0-9-_]%_%ig;
@@ -560,9 +575,9 @@ sub process_options {
      \%opt,
      'help',
      'version',
-     'lockdir=s'   => sub {$blockdir = $_[1]; &_ccr2(@_);},
+     'lockdir=s'   => sub {$_[1] = &get_full_path($_[1]); $blockdir = $_[1]; &_ccr2(@_);},
      'checkfile=s' => sub {push @checkfiles, $_[1]; &_cc2(@_);},
-     'name=s'      => sub {$tname = $_[1]; &_ccr2(@_)},
+     'name=s'      => sub {$_[1] = &adapt_name($_[1]); $name = $_[1]; &_ccr2(@_)},
      'Verbose'     => sub {$verb++; &_cc1(@_);},
      'badErase'    => sub {$redobad++; &_ccr1(@_);},
      'okquit'      => sub {$okquit++; &_ccr1(@_);},
@@ -648,7 +663,7 @@ required_options are:
   --lockdir ldir
       base lock directory, used to create the actual lock directory (default location of the logfile)
   --name jobid
-      the unique ID (text value) representing one\'s job (fixed so that it remove any leading and trailing space, and transforming any characters not a-z, 0-9 or - to _)
+      the unique ID (text value) representing one\'s job (fixed so that it remove any leading and trailing space, and transforming any characters not a-z, 0-9 or - to _). Use \"$auto_name\" to have an automatic name generated with: YYYYMMDD-HHMMSS___PID___RANDof1000000
   --executable script
       executable file to run (only required in non \'command_line_to_run\' mode)
 
@@ -670,8 +685,8 @@ required_options are:
       If the command line to run was run successfully (or previously run successfully with no need to be rerun), return the user provided error code, any other return code indicates a non successful completion (including skipping job)
   --ignoreChildSignal
       Do not exit with error if the job exited on a SIGNAL. The default is to consider any signal an error condition (ex: SIGINT) 
-  --saveConfig file
-      Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using \'--useConfig\'
+  --saveConfig file|dir
+      Do not run anything, instead save the command line options needed to run that specific JobRunner job into a specified configuration file that can be loaded in another JobRunner call using \'--useConfig\'. If a directory is provided, the \'jobid\' will be used as the file name within that directory.
   --useConfig file
       Use one (and only one) JobRunner configuration files generated by \'--saveConfig\'. To run on multiple files, use \'JobRunner_Caller\'.
   --toPrint text
