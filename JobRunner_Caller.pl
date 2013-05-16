@@ -401,7 +401,9 @@ sub doit {
   $allsetsdone{$jrc}++; # if > 1 it means we have already done it in the past
   # and therefore do not print "skip" info anymore
 
-  my $header = "\n\n[**] (" . 1+$jrc_i . "/$jrc_max) Job Runner Config: \'$jrc\'";
+  my $header = "\n\n[**] (" . 1+$jrc_i . "/$jrc_max \@" 
+    . JRHelper::epoch2str(JRHelper::get_scalar_currenttime()) 
+    . ") Job Runner Config: \'$jrc\'";
 
   my $err = JRHelper::check_file_r($jrc);
   return(0,
