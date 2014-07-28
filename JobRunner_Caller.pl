@@ -82,6 +82,18 @@ if (! $have_everything) {
 # Use the long mode of Getopt
 Getopt::Long::Configure(qw(auto_abbrev no_ignore_case));
 
+## Debug options START
+# comment section if not using
+use File::Tee qw(tee);
+sub __dbg_get_date { return(JRHelper::epoch2str(JRHelper::get_scalar_currenttime()) . ": " . $_[0]); }
+{ my $date = JRHelper::epoch2str(JRHelper::get_scalar_currenttime());
+  my $_dbg_ofile = $ENV{'HOME'} . "/_____log_____JobRunner_Caller.pl_____".$date.".$$";
+  tee STDOUT, { prefix => 'OUT: ', preprocess => \&__dbg_get_date, lock => 1, mode => '>>', open => $_dbg_ofile };
+  tee STDERR, { prefix => 'ERR: ', preprocess => \&__dbg_get_date, lock => 1, mode => '>>', open => $_dbg_ofile }; }
+## Debug options END
+
+
+
 ########################################
 # Options processing
 
