@@ -242,8 +242,12 @@ sub __add2tobedone {
 
 do {{ # transform 'do' in a valid loop, see: http://perldoc.perl.org/perlsyn.html#Loop-Control
   if (! JRHelper::does_file_exist($quitfile)) {
+      print " !! \'QuitFile\' disappeared, will exit after this loop iteration\n";
     $kdi = 0;
     next;
+  } else { # Re-inforce date on the quit file (if the file exists to avoid deletion from inactivity in temp location)
+      JRHelper::error_quit("Problem writing to \'QuitFile\' ($quitfile)")
+          if (! JRHelper::writeTo($quitfile, "", 0, 0, JRHelper::get_scalar_currenttime()));
   }
 
   my $qtxt = "\% Reminder: to quit properly after a Job/during a Set, delete the \'QuitFile\': $quitfile";
