@@ -59,8 +59,8 @@ dist_head:
 	@fgrep JobRunner ${JOBRUNNER_VERSION} > /dev/null
 
 dist_archive_pre_remove:
-	@rm -rf /tmp/`cat ${JOBRUNNER_VERSION}`/${JOBRUNNER_VERSION}
-	@rm -rf /tmp/`cat ${JOBRUNNER_VERSION}`/Makefile
+	@rm -rf /tmp/`cat ${JOBRUNNER_VERSION}`/.git*
+	@rm -f /tmp/`cat ${JOBRUNNER_VERSION}`/Makefile
 
 dist_common:
 	@cp ${JOBRUNNER_VERSION} /tmp

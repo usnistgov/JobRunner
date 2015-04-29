@@ -1,7 +1,7 @@
 package JRHelper;
 # -*- mode: Perl; tab-width: 2; indent-tabs-mode: nil -*- # For Emacs
 #
-# $Id:$
+# $Id$
 #
 # JobRunner's Helper Functions
 #  (small adapted/extended subset of F4DE's common/lib/MMisc.pm)
