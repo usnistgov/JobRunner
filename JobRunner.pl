@@ -1,7 +1,9 @@
 #!/usr/bin/env perl
 # -*- mode: Perl; tab-width: 2; indent-tabs-mode: nil -*- # For Emacs
-
-# Job Runner
+#
+# $Id:$
+#
+# JobRunner
 #
 # Author(s): Martial Michel
 #
@@ -30,19 +32,6 @@ use lib ($sd);
 # Note: Designed for UNIX style environments (ie use cygwin under Windows).
 
 ##########
-# Version
-
-# $Id$
-my $version     = "0.1b";
-
-if ($version =~ m/b$/) {
-  (my $cvs_version = '$Revision$') =~ s/[^\d\.]//g;
-  $version = "$version (CVS: $cvs_version)";
-}
-
-my $versionid = "Job Runner Version: $version";
-
-##########
 # Check we have every module (perl wise)
 
 sub eo2pe {
@@ -64,6 +53,9 @@ foreach my $pn ("JRHelper") {
     $have_everything = 0;
   }
 }
+my $version = JRHelper::slurp_file(dirname(abs_path($0)) . "/.jobrunner_version");
+$version =~ s%^.+\-%%;
+my $versionid = "JobRunner $version";
 
 # usualy part of the Perl Core
 foreach my $pn ("Getopt::Long") {

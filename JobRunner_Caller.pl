@@ -1,7 +1,9 @@
 #!/usr/bin/env perl
 # -*- mode: Perl; tab-width: 2; indent-tabs-mode: nil -*- # For Emacs
-
-# Job Runner Caller
+#
+# $Id:$
+#
+# JobRunner_Caller
 #
 # Author(s): Martial Michel
 #
@@ -10,7 +12,7 @@
 # Pursuant to Title 17 Section 105 of the United States Code this software is not subject to 
 # copyright protection within the United States and is in the public domain.
 #
-# "JobRunner Caller" is an experimental system.
+# "JobRunner_Caller" is an experimental system.
 # NIST assumes no responsibility whatsoever for its use by any party.
 #
 # THIS SOFTWARE IS PROVIDED "AS IS."  With regard to this software, NIST MAKES NO EXPRESS
@@ -28,19 +30,6 @@ BEGIN {
 use lib ($sd);
 
 # Note: Designed for UNIX style environments (ie use cygwin under Windows).
-
-##########
-# Version
-
-# $Id$
-my $version     = "0.1b";
-
-if ($version =~ m/b$/) {
-  (my $cvs_version = '$Revision$') =~ s/[^\d\.]//g;
-  $version = "$version (CVS: $cvs_version)";
-}
-
-my $versionid = "JobRunner Caller Version: $version";
 
 ##########
 # Check we have every module (perl wise)
@@ -64,6 +53,9 @@ foreach my $pn ("JRHelper") {
     $have_everything = 0;
   }
 }
+my $version = JRHelper::slurp_file(dirname(abs_path($0)) . "/.jobrunner_version");
+$version =~ s%^.+\-%%;
+my $versionid = "JobRunner_Caller $version";
 
 # usualy part of the Perl Core
 foreach my $pn ("Getopt::Long") {

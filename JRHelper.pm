@@ -1,6 +1,8 @@
 package JRHelper;
 # -*- mode: Perl; tab-width: 2; indent-tabs-mode: nil -*- # For Emacs
-
+#
+# $Id:$
+#
 # JobRunner's Helper Functions
 #  (small adapted/extended subset of F4DE's common/lib/MMisc.pm)
 #
@@ -18,24 +20,12 @@ package JRHelper;
 # OR IMPLIED WARRANTY AS TO ANY MATTER WHATSOEVER, INCLUDING MERCHANTABILITY,
 # OR FITNESS FOR A PARTICULAR PURPOSE.
 
-
-# $Id$
-
 use strict;
 
 use File::Temp qw(tempdir tempfile);
 use Data::Dumper;
 use Cwd qw(cwd abs_path);
 use Time::HiRes qw(gettimeofday tv_interval usleep);
-
-my $version     = '0.1b';
-
-if ($version =~ m/b$/) {
-  (my $cvs_version = '$Revision$') =~ s/[^\d\.]//g;
-  $version = "$version (CVS: $cvs_version)";
-}
-
-my $versionid = "JRHelper.pm Version: $version";
 
 ########## No 'new' ... only functions to be useful
 
